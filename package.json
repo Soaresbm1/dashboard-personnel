@@ -1,0 +1,12 @@
+{
+  "name": "mon-espace-dashboard",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:auth": "node scripts/build-msal.mjs",
+    "check": "node --check app.js && node --check outlook.js && node --check outlook-core.mjs"
+  },
+  "dependencies": { "@azure/msal-browser": "5.27.0" },
+  "devDependencies": { "esbuild": "0.28.2" }
+}
