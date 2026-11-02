@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#254c3c">
+  <meta name="description" content="Votre espace personnel pour faire de la place à l’essentiel. Tâches, projets, habitudes et notes, à votre rythme.">
+  <title>Mon espace — Votre quotidien, au clair</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <svg xmlns="http://www.w3.org/2000/svg" class="icon-library" aria-hidden="true" style="display:none">
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-task" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="m8 12 3 3 5-6"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 8V6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z"/></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><path d="M14 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-9M13 5l6 6M10 14l1-5 7-7 4 4-7 7Z"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="m10 3-.6 3-2 .9-2.6-1.5L2.8 9l2.3 2v2l-2.3 2 2 3.6 2.6-1.5 2 .9.6 3h4l.6-3 2-.9 2.6 1.5 2-3.6-2.3-2v-2l2.3-2-2-3.6-2.6 1.5-2-.9L14 3Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 3h7v7M21 3 10 14M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M20 3c0 10-1 16-9 16a7 7 0 0 1-7-7C4 4 12 4 20 3ZM3 21 15 9"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="m14 5 5 5M4 20l5-1L21 7l-5-5L4 14Z"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 4 12 8-12 8Z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 10a9 9 0 1 1 1 7M3 3v7h7"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Z"/><path d="m8 12 3 3 5-6"/></symbol>
+  </svg>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Navigation principale">
+      <a class="brand" href="#overview" aria-label="Mon espace, accueil"><span class="brand-mark"><svg class="icon"><use href="#i-grid"/></svg></span>mon espace<span class="brand-dot">.</span></a>
+      <p class="workspace-label">VOTRE QUOTIDIEN, AU CLAIR</p>
+      <nav class="navigation">
+        <button class="nav-button active" data-view="overview" aria-current="page"><svg class="icon"><use href="#i-grid"/></svg><span>Vue d’ensemble</span></button>
+        <button class="nav-button" data-view="tasks"><svg class="icon"><use href="#i-task"/></svg><span>Mes tâches</span><small id="nav-task-count" class="nav-count">3</small></button>
+        <button class="nav-button" data-view="projects"><svg class="icon"><use href="#i-folder"/></svg><span>Mes projets</span></button>
+        <button class="nav-button" data-view="notes"><svg class="icon"><use href="#i-note"/></svg><span>Mes notes</span></button>
+      </nav>
+      <div class="sidebar-motto"><span class="motto-art" aria-hidden="true">✳</span><p>Un petit pas.<br>Une belle avancée.</p><small>À votre rythme, chaque jour.</small></div>
+      <div class="sidebar-bottom">
+        <button class="nav-button" data-action="settings"><svg class="icon"><use href="#i-settings"/></svg><span>Personnaliser</span></button>
+        <div class="storage-status"><span class="status-dot"></span><span>Sauvegarde dans ce navigateur</span></div>
+        <button class="profile-button" data-action="settings"><span class="avatar" id="avatar">M</span><span><strong id="profile-name">Mon espace personnel</strong><small>Un espace rien qu’à vous</small></span></button>
+      </div>
+    </aside>
+    <main class="main" id="main">
+      <header class="topbar"><div class="breadcrumb">Mon espace <span>/</span> <strong id="breadcrumb-current">Vue d’ensemble</strong></div><div class="topbar-actions"><span class="date-label" id="top-date"></span><button class="icon-button" data-action="settings" aria-label="Personnaliser le dashboard"><svg class="icon"><use href="#i-settings"/></svg></button></div></header>
+      <div id="storage-warning" role="alert" hidden>La sauvegarde locale est indisponible. Exportez vos données dans « Personnaliser » pour les conserver.</div>
+      <section class="view" id="view-overview" aria-labelledby="overview-title">
+        <div class="page-heading"><div><p class="eyebrow" id="greeting">BONJOUR, À VOTRE RYTHME</p><h1 id="overview-title">De la place pour l’essentiel<span class="title-dot">.</span></h1><p>Vos idées, vos projets et les petits pas qui font avancer.</p></div><div class="heading-actions"><button class="button button-primary" data-action="add-task"><svg class="icon"><use href="#i-plus"/></svg>Nouvelle tâche</button></div></div>
+        <div class="welcome-card" id="welcome-card"><div class="welcome-illustration" aria-hidden="true"><span class="welcome-sun"></span><span class="welcome-hill"></span></div><div class="welcome-copy"><span class="section-label">TOUT COMMENCE ICI</span><h2>Un espace qui vous ressemble.</h2><p>Quelques suggestions pour démarrer. Adaptez-les, ajoutez vos projets et prenez vos marques.</p><button class="text-button" data-action="settings">Personnaliser mon espace <svg class="icon"><use href="#i-arrow"/></svg></button></div><button class="icon-button dismiss-button" data-action="dismiss-welcome" aria-label="Masquer le message de bienvenue"><svg class="icon"><use href="#i-close"/></svg></button></div>
+        <div class="summary-card summary-grid" aria-label="Votre progression"><div class="summary-item"><span class="summary-icon sage"><svg class="icon"><use href="#i-task"/></svg></span><div><div class="summary-number" id="summary-tasks">0 <small>/ 3</small></div><span class="summary-caption">tâches terminées</span></div><span class="summary-trend" id="summary-percent">0 %</span></div><div class="summary-item"><span class="summary-icon lilac"><svg class="icon"><use href="#i-folder"/></svg></span><div><div class="summary-number" id="summary-projects">0</div><span class="summary-caption">projets en cours</span></div></div><div class="summary-item"><span class="summary-icon peach"><svg class="icon"><use href="#i-clock"/></svg></span><div><div class="summary-number" id="summary-focus">0 <small>min</small></div><span class="summary-caption">de concentration aujourd’hui</span></div></div></div>
+        <div class="dashboard-grid"><div class="main-column">
+          <section class="card tasks-card"><div class="card-header"><div><h2>Un jour à la fois <span class="count-badge" id="daily-count">3</span></h2><p id="selected-day-label">Vos priorités du jour</p></div><button class="icon-button" data-action="add-task" aria-label="Ajouter une tâche"><svg class="icon"><use href="#i-plus"/></svg></button></div><div class="week-strip" id="week-strip" aria-label="Choisir un jour"></div><div class="task-list" id="daily-tasks"></div><button class="card-bottom-link text-button" data-view="tasks">Toutes mes tâches <svg class="icon"><use href="#i-arrow"/></svg></button></section>
+          <section class="card"><div class="card-header"><div><h2>Les projets qui comptent</h2><p>Une envie. Un objectif. Un premier pas.</p></div><button class="icon-button" data-action="add-project" aria-label="Ajouter un projet"><svg class="icon"><use href="#i-plus"/></svg></button></div><div id="overview-projects"></div></section>
+          <section class="card links-card"><div class="card-header"><div><h2>À portée de clic</h2><p>Vos raccourcis vers l’essentiel.</p></div><button class="icon-button" data-action="add-link" aria-label="Ajouter un raccourci"><svg class="icon"><use href="#i-plus"/></svg></button></div><div class="links-grid" id="quick-links"></div></section>
+        </div><div class="side-column">
+          <section class="focus-card" aria-labelledby="focus-title"><div class="focus-top"><h2 id="focus-title"><svg class="icon"><use href="#i-sun"/></svg>Un moment pour avancer</h2><span class="focus-chip">FOCUS</span></div><div class="focus-orbit" id="focus-orbit"><div class="timer-face"><span class="timer-value" id="timer-value" role="timer" aria-live="off">25:00</span><span class="timer-caption" id="timer-caption">Une seule chose à la fois.</span></div></div><div class="timer-controls"><button class="button" id="timer-toggle" data-action="timer-toggle"><svg class="icon"><use href="#i-play"/></svg><span>Commencer</span></button><button class="icon-button" data-action="timer-reset" aria-label="Réinitialiser le minuteur"><svg class="icon"><use href="#i-reset"/></svg></button></div><div class="focus-footer"><label for="focus-duration">Ma session</label><select id="focus-duration" class="select"><option value="15">15 minutes</option><option value="25" selected>25 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option></select></div></section>
+          <section class="card habits-card"><div class="card-header"><div><h2>Les petits rituels <svg class="icon leaf-icon"><use href="#i-leaf"/></svg></h2><p id="habit-caption">Un peu chaque jour, c’est déjà beaucoup.</p></div><button class="icon-button" data-action="add-habit" aria-label="Ajouter une habitude"><svg class="icon"><use href="#i-plus"/></svg></button></div><div id="habits-list"></div><div class="habit-week" id="habit-week" aria-label="Habitudes de la semaine"></div></section>
+          <section class="card notes-card"><div class="card-header"><div><h2>Une idée en passant</h2><p>Libérez un peu d’espace dans votre tête.</p></div><svg class="icon"><use href="#i-note"/></svg></div><label class="sr-only" for="quick-note">Mes notes personnelles</label><textarea class="quick-note" id="quick-note" placeholder="Une idée, une envie, quelque chose à ne pas oublier…"></textarea><div class="notes-footer"><span class="save-label" id="note-save-label">Sauvegarde automatique</span><button class="text-button" data-view="notes">Agrandir <svg class="icon"><use href="#i-external"/></svg></button></div></section>
+        </div></div>
+      </section>
+      <section class="view" id="view-tasks" aria-labelledby="tasks-title" hidden><div class="page-heading"><div><p class="eyebrow">UNE CHOSE APRÈS L’AUTRE</p><h1 id="tasks-title">Mes tâches<span class="title-dot">.</span></h1><p>Faites de la place à ce qui compte vraiment.</p></div><button class="button button-primary" data-action="add-task"><svg class="icon"><use href="#i-plus"/></svg>Nouvelle tâche</button></div><div class="card"><div class="task-filters" role="group" aria-label="Filtrer les tâches"><button class="filter-button active" data-filter="all" aria-pressed="true">Toutes</button><button class="filter-button" data-filter="open" aria-pressed="false">À faire</button><button class="filter-button" data-filter="done" aria-pressed="false">Terminées</button></div><div id="all-tasks" class="task-list"></div></div></section>
+      <section class="view" id="view-projects" aria-labelledby="projects-title" hidden><div class="page-heading"><div><p class="eyebrow">DE L’ENVIE À L’ACTION</p><h1 id="projects-title">Mes projets<span class="title-dot">.</span></h1><p>Vos idées méritent un premier pas.</p></div><button class="button button-primary" data-action="add-project"><svg class="icon"><use href="#i-plus"/></svg>Nouveau projet</button></div><div class="project-grid" id="all-projects"></div></section>
+      <section class="view" id="view-notes" aria-labelledby="notes-title" hidden><div class="page-heading"><div><p class="eyebrow">LES IDÉES ONT LEUR PLACE ICI</p><h1 id="notes-title">Mes notes<span class="title-dot">.</span></h1><p>Écrivez librement. Vos mots sont sauvegardés au fil de la saisie.</p></div><button class="button button-secondary" data-action="export"><svg class="icon"><use href="#i-download"/></svg>Exporter mes données</button></div><div class="card full-notes-card"><label class="sr-only" for="full-note">Mes notes personnelles</label><textarea id="full-note" class="full-note" placeholder="Tout commence par une idée…"></textarea><div class="notes-footer"><span class="save-label" id="full-note-save">Sauvegarde dans ce navigateur</span><span id="note-word-count">0 mot</span></div></div></section>
+      <footer class="page-footer"><span>Un peu de clarté, chaque jour.</span><span><svg class="icon"><use href="#i-shield"/></svg>Vos données restent dans ce navigateur.</span></footer>
+    </main>
+  </div>
+  <dialog id="modal" class="modal" aria-labelledby="modal-title"><form id="modal-form"><div class="modal-header"><h2 id="modal-title"></h2><button class="icon-button" type="button" data-action="close-modal" aria-label="Fermer"><svg class="icon"><use href="#i-close"/></svg></button></div><div id="modal-body" class="modal-body"></div><p class="error-text" id="form-error" role="alert" hidden></p><div class="modal-footer"><button type="button" class="button button-secondary" data-action="close-modal">Annuler</button><button class="button button-primary" type="submit" id="modal-submit">Enregistrer</button></div></form></dialog>
+  <div class="toast" id="toast" role="status" hidden><span id="toast-message"></span><button id="toast-undo" class="text-button" hidden>Annuler</button><button class="icon-button" data-action="dismiss-toast" aria-label="Masquer le message"><svg class="icon"><use href="#i-close"/></svg></button></div>
+  <input id="import-file" type="file" accept="application/json,.json" hidden>
+</body>
+</html>
