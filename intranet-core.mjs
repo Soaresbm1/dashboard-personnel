@@ -2,7 +2,7 @@
 export const INTRANET_CONFIG_KEY = 'mon-espace-intranet-config-v1';
 export const INTRANET_ORIGIN = 'https://intranet.isp-spi.ch';
 export const INTRANET_API_URL = `${INTRANET_ORIGIN}/api/dashboard/v1/work`;
-// Public registration IDs for this personal deployment; used only to prefill the setup form.
+// Public registration IDs for this personal deployment and its setup form.
 export const INTRANET_DEPLOYMENT_IDS = Object.freeze({
   clientId: 'bd2a054b-f9ea-4740-b90c-16a132f90bc4',
   tenantId: '0b394bfa-2e05-46ef-9a28-487a32ca0014',

@@ -12,7 +12,7 @@ Les tâches et habitudes initiales sont des suggestions à personnaliser.
 
 ## Agenda Outlook professionnel
 
-Le bloc « Mon agenda Outlook » permet une connexion Microsoft 365 en lecture seule et affiche les événements du jour ou de la semaine du calendrier principal, y compris les occurrences de réunions récurrentes. Le site interroge directement Microsoft Graph après connexion. Les événements, comptes Microsoft et jetons restent en mémoire et ne sont ni envoyés à GitHub ni inclus dans les exports JSON. Une actualisation de la page nécessite une nouvelle connexion Microsoft. Seuls les identifiants publics d’application et de locataire sont enregistrés localement, séparément des données du dashboard.
+Le bloc « Mon agenda Outlook » permet une connexion Microsoft 365 en lecture seule et affiche les événements du jour ou de la semaine du calendrier principal, y compris les occurrences de réunions récurrentes. Le site interroge directement Microsoft Graph après connexion. Les événements restent uniquement en mémoire ; ils ne sont ni envoyés à GitHub ni inclus dans les exports JSON. Microsoft MSAL conserve les informations de connexion dans son cache localStorage pour retrouver le compte et renouveler les jetons automatiquement après rechargement. Le code du dashboard ne copie jamais les jetons dans ses propres données ou exports.
 
 ### Configuration Microsoft Entra
 
@@ -20,9 +20,13 @@ Le bloc « Mon agenda Outlook » permet une connexion Microsoft 365 en lecture s
 2. Enregistrer la plateforme **Application à page unique (SPA)** avec cette adresse de retour exacte : `https://soaresbm1.github.io/dashboard-personnel/auth-redirect.html`.
 3. Ajouter l’autorisation Microsoft Graph **déléguée** `Calendars.ReadBasic`. Aucun secret client ni autorisation d’application sur toutes les boîtes aux lettres n’est utilisé.
 4. Dans l’application d’entreprise, activer **Affectation requise ? = Oui**, puis affecter uniquement le compte utilisateur prévu, sans groupe. Une affectation obligatoire nécessite l’approbation administrative des autorisations déléguées. Les privilèges inhérents aux administrateurs généraux du tenant restent applicables.
-5. Dans « Configurer Outlook » sur le dashboard, enregistrer l’ID d’application (client) et l’ID d’annuaire (locataire), puis choisir « Connecter Microsoft 365 ».
+5. Les identifiants publics de ce déploiement sont déjà intégrés. Choisir « Connecter Microsoft 365 » avec le compte autorisé. Les réglages avancés permettent de conserver une configuration personnalisée existante.
 
-Le site GitHub Pages reste public. La restriction des comptes est appliquée par Microsoft Entra, et non par un filtrage d’adresse e-mail dans le JavaScript public. La connexion ne modifie pas les rendez-vous. Déconnecter le calendrier efface les événements affichés et le cache d’authentification de cette application sans déconnecter les autres services Microsoft.
+Le site GitHub Pages reste public. La restriction des comptes est appliquée par Microsoft Entra et par l’API intranet. Le navigateur ne restaure que l’identité immuable du propriétaire prévue pour ce déploiement (locataire et OID), sans se fier à l’adresse email. La connexion ne modifie pas les rendez-vous. « Déconnecter Microsoft » retire les deux listes affichées, désactive la restauration automatique et purge le cache MSAL du compte utilisé, sans terminer la session Microsoft des autres sites. Cette déconnexion est aussi répercutée dans les autres onglets ouverts du dashboard.
+
+### Connexion mémorisée
+
+Outlook et l’intranet partagent une instance MSAL pour le même client et locataire. Au chargement, une connexion déjà choisie est reprise avec `acquireTokenSilent`, séparément pour chaque permission. Aucun popup ne s’ouvre automatiquement. Une validation Microsoft nécessaire fait apparaître « Reconnecter ». Après la mise à jour depuis l’ancien cache en mémoire, effectuer une première connexion pour initialiser le cache persistant. Pour conserver la session après fermeture complète du navigateur, accepter « Rester connecté » si Microsoft le propose ; les règles de l’organisation et les expirations continuent de s’appliquer. [Documentation du cache MSAL](https://learn.microsoft.com/en-us/entra/msal/javascript/browser/caching).
 
 Documentation : [MSAL Browser](https://learn.microsoft.com/en-us/entra/msal/javascript/browser/about-msal-browser), [accès réservé aux utilisateurs affectés](https://learn.microsoft.com/en-us/entra/identity-platform/howto-restrict-your-app-to-a-set-of-users), [calendrier Microsoft Graph](https://learn.microsoft.com/en-us/graph/api/user-list-calendarview?view=graph-rest-1.0).
 
@@ -39,10 +43,10 @@ Le bloc « Mon intranet » lit les éléments attribués au compte connecté, au
 1. Déployer l’API de lecture de l’intranet et la configurer avec l’identité immuable du seul compte autorisé. L’API vérifie ce compte et ses attributions côté serveur, indépendamment du navigateur.
 2. Déclarer l’API dans Microsoft Entra avec une permission **déléguée** `api://<ID-application-API>/Dashboard.Read`, puis autoriser l’application SPA « dashboard » à demander cette permission. La permission Outlook `Calendars.ReadBasic` reste séparée : un jeton Microsoft Graph n’est jamais envoyé à l’intranet.
 3. Conserver la redirection SPA déjà enregistrée : `https://soaresbm1.github.io/dashboard-personnel/auth-redirect.html`. Autoriser uniquement l’origine `https://soaresbm1.github.io` dans les réglages CORS de l’API.
-4. Dans « Configurer la connexion intranet », vérifier puis enregistrer l’ID de l’application du dashboard, l’ID du locataire et l’ID de l’application API. Les identifiants publics de ce déploiement personnel sont préremplis pour éviter une copie manuelle. Une configuration intranet déjà sauvegardée reste prioritaire ; sinon, les identifiants Outlook existants sont proposés pour le dashboard et le locataire. Le préremplissage ne sauvegarde rien, ne charge pas Microsoft et ne lance aucune connexion avant validation de l’utilisateur. Aucun secret, jeton ou identifiant personnel n’est demandé.
+4. Les identifiants publics de ce déploiement personnel sont disponibles sans copie manuelle. Une configuration intranet déjà sauvegardée reste prioritaire ; les réglages avancés proposent aussi les identifiants Outlook existants. Aucun secret n’est demandé.
 5. Choisir « Connecter l’intranet » avec le compte autorisé. Le navigateur doit pouvoir joindre l’intranet ; le réseau professionnel ou son VPN peut être nécessaire.
 
-Les connexions Outlook et intranet ont chacune leur cache MSAL en mémoire. Déconnecter l’intranet ne déconnecte pas les autres services Microsoft. Une actualisation de la page nécessite de se reconnecter. Le module refuse les redirections réseau et ne transmet son jeton qu’à l’adresse API fixe ci-dessus. L’accès est refusé par défaut tant que l’API n’est pas activée et correctement configurée.
+La connexion Microsoft est partagée avec Outlook et mémorisée dans ce navigateur. Les tâches et tickets restent en mémoire, hors du cache d’authentification et des exports. Une annulation de connexion ou une erreur de récupération intranet n’efface pas le cache Outlook. Le module refuse les redirections réseau et ne transmet son jeton qu’à l’adresse API fixe ci-dessus. L’accès est refusé par défaut tant que l’API n’est pas activée et correctement configurée.
 
 ## Publication avec GitHub Pages
 

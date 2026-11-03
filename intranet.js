@@ -1,8 +1,10 @@
 import { OUTLOOK_CONFIG_KEY, normalizeOutlookConfig, retryAfterMilliseconds } from './outlook-core.mjs';
 import { INTRANET_CONFIG_KEY, INTRANET_API_URL, INTRANET_DEPLOYMENT_IDS, normalizeIntranetConfig, intranetScope, normalizeIntranetWork,
   intranetStatusLabel, intranetPriority, intranetDueLabel } from './intranet-core.mjs';
+import { getMicrosoftClient, isDashboardMicrosoftAccount, getRememberedMicrosoftAccount, rememberMicrosoftAccount,
+  clearMicrosoftSession, subscribeMicrosoftSignOut } from './microsoft-session.mjs';
 
-// Work items, Microsoft accounts and access tokens stay in memory, outside dashboard exports.
+// Work items stay in memory. Microsoft manages the persistent sign-in cache separately.
 export function initializeIntranetWork(options = {}) {
   const doc = options.document || globalThis.document, win = options.window || globalThis.window;
   const get = selector => doc.querySelector(selector);
@@ -18,10 +20,12 @@ export function initializeIntranetWork(options = {}) {
     config = saved ? normalizeIntranetConfig(JSON.parse(saved)) : null;
     if (saved && !config) storageProblem = true;
   } catch { storageProblem = true; }
+  config ||= normalizeIntranetConfig(INTRANET_DEPLOYMENT_IDS);
   let pca = null, sdk = null, account = null, work = null, selectedKind = 'tasks';
-  let sdkLoading = false, authBusy = false, fetching = false, needsReconnect = false;
+  let sdkLoading = false, authBusy = false, fetching = false, needsReconnect = false, signingOut = false;
   let sdkGeneration = 0, connectionGeneration = 0, requestGeneration = 0;
   let controller = null, retryTimer = null, retryUntil = 0, dialogTrigger = null;
+  let unsubscribeSignOut = null;
 
   function setStatus(message, state = '') {
     get('#intranet-status').textContent = message; get('#intranet-status').dataset.state = state;
@@ -39,7 +43,7 @@ export function initializeIntranetWork(options = {}) {
     const connected = !!account, connect = get('#intranet-connect');
     connect.hidden = connected && !needsReconnect;
     connect.disabled = sdkLoading || authBusy;
-    connect.textContent = !config ? 'Configurer l’intranet' : sdkLoading ? 'Préparation…' : authBusy ? 'Connexion…' : needsReconnect ? 'Reconnecter l’intranet' : 'Connecter l’intranet';
+    connect.textContent = !config ? 'Configurer l’intranet' : signingOut ? 'Déconnexion…' : sdkLoading ? 'Préparation…' : authBusy ? 'Connexion…' : needsReconnect ? 'Reconnecter l’intranet' : 'Connecter l’intranet';
     get('#intranet-refresh').hidden = !connected;
     get('#intranet-refresh').disabled = !connected || needsReconnect || fetching || authBusy || Date.now() < retryUntil;
     get('#intranet-disconnect').hidden = !connected; get('#intranet-disconnect').disabled = authBusy;
@@ -50,7 +54,7 @@ export function initializeIntranetWork(options = {}) {
       button.disabled = !work || fetching || authBusy;
       button.setAttribute('aria-pressed', String(button.dataset.intranetKind === selectedKind));
     });
-    get('#intranet-forget-config').hidden = !config;
+    get('#intranet-forget-config').hidden = !config; get('#intranet-forget-config').disabled = authBusy;
   }
   function cancelRequests() {
     requestGeneration++; controller?.abort(); controller = null; fetching = false;
@@ -68,26 +72,29 @@ export function initializeIntranetWork(options = {}) {
     get('#intranet-setup-title').focus({ preventScroll: true }); get('#intranet-setup').scrollTop = 0;
   }
   function closeSetup() { get('#intranet-setup').close(); }
-  async function clearCache(application, signedInAccount) {
-    if (!application) return;
-    try { application.setActiveAccount(null); await application.clearCache(signedInAccount ? { account: signedInAccount } : undefined); }
-    catch { /* All local references are discarded even if SDK cleanup fails. */ }
+  function clearSignedOutView(pending = false) {
+    connectionGeneration++; account = null; needsReconnect = false; signingOut = Boolean(pending); authBusy = signingOut; cancelRequests();
+    clearWork('Connectez votre compte pour retrouver vos tâches et vos tickets.');
+    setStatus(signingOut ? 'Déconnexion de Microsoft en cours…' : 'Microsoft est déconnecté de ce dashboard.'); controls();
+  }
+  function bindSignOut() {
+    unsubscribeSignOut?.();
+    unsubscribeSignOut = subscribeMicrosoftSignOut({ config, window: win }, clearSignedOutView);
   }
   async function prepareSdk() {
     if (!config) return;
     const generation = ++sdkGeneration, snapshot = { ...config };
     sdkLoading = true; pca = null; setStatus('Préparation de la connexion à l’intranet…', 'loading'); controls();
     try {
-      const library = await loadSdk();
-      const application = new library.PublicClientApplication({
-        auth: { clientId: snapshot.clientId, authority: `https://login.microsoftonline.com/${snapshot.tenantId}`, redirectUri },
-        cache: { cacheLocation: 'memoryStorage' },
-        system: { loggerOptions: { piiLoggingEnabled: false, loggerCallback: () => {} } }
-      });
-      await application.initialize();
-      if (generation !== sdkGeneration) { await clearCache(application, null); return; }
+      const { application, sdk: library } = await getMicrosoftClient({ config: snapshot, redirectUri, loadSdk, window: win });
+      if (generation !== sdkGeneration) return;
       sdk = library; pca = application;
-      setStatus(storageProblem ? 'Configuration disponible pour cette session. La sauvegarde locale est indisponible.' : 'Connectez votre compte pour lire vos tâches et vos tickets.');
+      const restored = getRememberedMicrosoftAccount({ application, config: snapshot, storage });
+      sdkLoading = false;
+      if (restored) {
+        account = restored; needsReconnect = false; controls();
+        await refresh();
+      } else setStatus(storageProblem ? 'Configuration disponible pour cette session. La sauvegarde locale est indisponible.' : 'Connectez votre compte pour lire vos tâches et vos tickets.');
     } catch {
       if (generation === sdkGeneration) setStatus('La connexion Microsoft ne peut pas être préparée. Vérifiez votre connexion puis réessayez.', 'error');
     } finally { if (generation === sdkGeneration) { sdkLoading = false; controls(); } }
@@ -96,8 +103,9 @@ export function initializeIntranetWork(options = {}) {
     const code = error?.errorCode || '';
     if (['user_cancelled', 'user_canceled'].includes(code)) return 'Connexion annulée. Vous pourrez réessayer quand vous le souhaitez.';
     if (code === 'interaction_in_progress') return 'Une connexion Microsoft est déjà ouverte. Terminez-la avant de connecter l’intranet.';
-    if (['popup_window_error', 'empty_window_error', 'popup_window_timeout', 'monitor_popup_timeout'].includes(code)) return 'La fenêtre Microsoft n’a pas pu terminer la connexion. Autorisez les fenêtres de ce site ou ouvrez le dashboard dans votre navigateur.';
+    if (['popup_window_error', 'empty_window_error', 'popup_window_timeout', 'monitor_popup_timeout', 'timed_out'].includes(code)) return 'La fenêtre Microsoft n’a pas pu terminer la connexion. Autorisez les fenêtres de ce site ou ouvrez le dashboard dans votre navigateur.';
     if (['consent_required', 'access_denied'].includes(code)) return 'La permission de lecture de l’intranet n’a pas été autorisée pour cette application.';
+    if (code === 'dashboard_account_not_allowed') return 'Choisissez le compte personnellement affecté au dashboard pour connecter l’intranet.';
     return 'La connexion à l’intranet n’a pas abouti. Vérifiez la configuration Microsoft et réessayez.';
   }
   async function connect() {
@@ -110,14 +118,20 @@ export function initializeIntranetWork(options = {}) {
     try {
       // Start from the user's click, without awaiting another operation before the popup.
       const response = await application.loginPopup({ scopes: [intranetScope(snapshot)], redirectUri, prompt: 'select_account' });
-      if (generation !== connectionGeneration) { await clearCache(application, response.account); return; }
-      if (!response.account || response.account.tenantId?.toLowerCase() !== snapshot.tenantId || !response.accessToken) throw new Error('Invalid account response');
-      account = response.account; needsReconnect = false; application.setActiveAccount(account);
+      if (generation !== connectionGeneration) return;
+      if (!isDashboardMicrosoftAccount(response.account, snapshot)) {
+        if (response.account && !isDashboardMicrosoftAccount(response.account, INTRANET_DEPLOYMENT_IDS)) {
+          try { await application.clearCache({ account: response.account }); } catch { /* Never purge the authorized account here. */ }
+        }
+        throw Object.assign(new Error('Unexpected Microsoft account'), { errorCode: 'dashboard_account_not_allowed' });
+      }
+      if (!response.accessToken) throw new Error('Invalid account response');
+      rememberMicrosoftAccount({ application, account: response.account, config: snapshot, storage });
+      account = response.account; needsReconnect = false;
       authBusy = false; controls(); await refresh(response.accessToken);
     } catch (error) {
       if (generation !== connectionGeneration) return;
-      account = null; needsReconnect = false; await clearCache(application, null);
-      if (generation !== connectionGeneration) return;
+      account = null; needsReconnect = false;
       clearWork('Vos tâches et vos tickets ne sont pas connectés.'); setStatus(connectionError(error), 'error');
     } finally { if (generation === connectionGeneration) { authBusy = false; controls(); } }
   }
@@ -174,8 +188,7 @@ export function initializeIntranetWork(options = {}) {
       if (interactionRequired || ['interaction_required', 'login_required', 'consent_required'].includes(error?.errorCode) || error.httpStatus === 401) {
         needsReconnect = true; setStatus('Votre session doit être renouvelée. Reconnectez l’intranet pour afficher vos éléments.', 'error');
       } else if (error.httpStatus === 403) {
-        account = null; needsReconnect = false; await clearCache(application, signedInAccount);
-        if (generation !== requestGeneration) return;
+        account = null; needsReconnect = false;
         setStatus('Ce compte n’est pas autorisé à consulter cette API. Utilisez le compte personnellement affecté au dashboard.', 'error');
       } else if (error.httpStatus === 503) setStatus('La connexion n’est pas encore activée sur l’intranet. Réessayez après son activation.', 'error');
       else if (error.httpStatus === 429) {
@@ -186,11 +199,12 @@ export function initializeIntranetWork(options = {}) {
     } finally { clearTimeout(timeout); if (generation === requestGeneration) { fetching = false; controller = null; controls(); } }
   }
   async function disconnect() {
-    const generation = ++connectionGeneration, application = pca, oldAccount = account;
-    account = null; needsReconnect = false; authBusy = true; cancelRequests();
+    const application = pca, oldAccount = account;
+    connectionGeneration++;
+    account = null; needsReconnect = false; signingOut = true; authBusy = true; cancelRequests();
     clearWork('Connectez votre compte pour retrouver vos tâches et vos tickets.'); setStatus('Intranet déconnecté de ce dashboard.'); controls();
-    await clearCache(application, oldAccount);
-    if (generation === connectionGeneration) { authBusy = false; controls(); }
+    // The shared sign-out notifications own the pending state until all cache cleanup ends.
+    await clearMicrosoftSession({ application, account: oldAccount, config, storage, window: win });
   }
 
   get('#intranet-connect').addEventListener('click', connect);
@@ -204,21 +218,25 @@ export function initializeIntranetWork(options = {}) {
   get('#intranet-setup').addEventListener('close', () => { if (dialogTrigger?.isConnected) dialogTrigger.focus(); });
   get('#intranet-config-form').addEventListener('submit', async event => {
     event.preventDefault();
+    if (authBusy) { formError('Patientez pendant la connexion ou la déconnexion de Microsoft.'); return; }
     const next = normalizeIntranetConfig({ clientId: get('#intranet-client-id').value, tenantId: get('#intranet-tenant-id').value, apiClientId: get('#intranet-api-client-id').value });
     if (!next) { formError('Renseignez les trois identifiants au format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.'); return; }
-    sdkGeneration++; connectionGeneration++; const application = pca, oldAccount = account;
+    sdkGeneration++; connectionGeneration++;
     cancelRequests(); account = null; pca = null; config = next; needsReconnect = false;
+    bindSignOut();
     try { storage?.setItem(INTRANET_CONFIG_KEY, JSON.stringify(config)); storageProblem = !storage; } catch { storageProblem = true; }
     closeSetup(); clearWork('La configuration est prête. Connectez maintenant votre compte.'); controls();
-    await clearCache(application, oldAccount); prepareSdk();
+    prepareSdk();
   });
   get('#intranet-forget-config').addEventListener('click', async () => {
-    sdkGeneration++; await disconnect(); config = null; pca = null; sdkLoading = false;
+    if (authBusy) return;
+    sdkGeneration++; await disconnect(); unsubscribeSignOut?.(); config = null; pca = null; sdkLoading = false;
     try { storage?.removeItem(INTRANET_CONFIG_KEY); } catch { storageProblem = true; }
     get('#intranet-api-client-id').value = ''; formError(''); setStatus('La connexion à l’intranet est à configurer.'); controls();
   });
   clearWork('Vos tâches et vos tickets professionnels, au même endroit.');
   setStatus(config ? 'Préparation de la connexion à l’intranet…' : storageProblem ? 'La configuration sauvegardée est indisponible. Configurez l’intranet pour continuer.' : 'La connexion à l’intranet est à configurer.');
+  bindSignOut();
   controls(); if (config) prepareSdk();
   return { disconnect, refresh, showSetup };
 }

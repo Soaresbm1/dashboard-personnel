@@ -3,9 +3,10 @@ import {
   calendarWindow, calendarRequestUrl, safeGraphPage, normalizeCalendarEvents,
   groupCalendarEvents, eventTimeLabel, retryAfterMilliseconds
 } from './outlook-core.mjs';
+import { MICROSOFT_DEPLOYMENT, getMicrosoftClient, getRememberedMicrosoftAccount, isDashboardMicrosoftAccount,
+  rememberMicrosoftAccount, clearMicrosoftSession, subscribeMicrosoftSignOut } from './microsoft-session.mjs';
 
-// This module deliberately keeps tokens, Microsoft account and calendar events in memory.
-// Only the two public Entra application identifiers are saved in localStorage.
+// Calendar events stay in memory; MSAL manages the remembered Microsoft connection.
 export function initializeOutlookAgenda(options = {}) {
   const doc = options.document || globalThis.document;
   const win = options.window || globalThis.window;
@@ -22,11 +23,13 @@ export function initializeOutlookAgenda(options = {}) {
     config = saved ? normalizeOutlookConfig(JSON.parse(saved)) : null;
     if (saved && !config) storageProblem = true;
   } catch { storageProblem = true; }
+  config ||= normalizeOutlookConfig(MICROSOFT_DEPLOYMENT);
   let pca = null, sdk = null, account = null, sdkLoading = false, authBusy = false;
-  let needsReconnect = false, fetching = false, selectedRange = 'today';
+  let needsReconnect = false, fetching = false, selectedRange = 'today', signingOut = false;
   let sdkGeneration = 0, connectionGeneration = 0, requestGeneration = 0;
   let controller = null, retryUntil = 0, retryTimer = null, dialogTrigger = null;
   let lastWindowDay = localDateKey(now());
+  let unsubscribeSignOut = null;
 
   function setStatus(message, state = '') {
     get('#outlook-status').textContent = message;
@@ -46,7 +49,7 @@ export function initializeOutlookAgenda(options = {}) {
     const connect = get('#outlook-connect');
     connect.hidden = connected && !needsReconnect;
     connect.disabled = sdkLoading || authBusy;
-    connect.textContent = !config ? 'Configurer Outlook' : sdkLoading ? 'Préparation…' : authBusy ? 'Connexion…' : needsReconnect ? 'Reconnecter Microsoft 365' : 'Connecter Microsoft 365';
+    connect.textContent = !config ? 'Configurer Outlook' : sdkLoading ? 'Préparation…' : authBusy ? signingOut ? 'Déconnexion…' : 'Connexion…' : needsReconnect ? 'Reconnecter Microsoft 365' : 'Connecter Microsoft 365';
     get('#outlook-refresh').hidden = !connected;
     get('#outlook-refresh').disabled = !connected || needsReconnect || fetching || authBusy || Date.now() < retryUntil;
     get('#outlook-disconnect').hidden = !connected;
@@ -59,7 +62,7 @@ export function initializeOutlookAgenda(options = {}) {
     });
     get('#outlook-events').setAttribute('aria-busy', String(fetching));
     const forget = get('#outlook-forget-config');
-    if (forget) forget.hidden = !config;
+    if (forget) { forget.hidden = !config; forget.disabled = authBusy; }
   }
   function cancelRequests() {
     requestGeneration++;
@@ -72,8 +75,8 @@ export function initializeOutlookAgenda(options = {}) {
   }
   function showSetup() {
     dialogTrigger = doc.activeElement;
-    get('#outlook-client-id').value = config?.clientId || '';
-    get('#outlook-tenant-id').value = config?.tenantId || '';
+    get('#outlook-client-id').value = config?.clientId || MICROSOFT_DEPLOYMENT.clientId;
+    get('#outlook-tenant-id').value = config?.tenantId || MICROSOFT_DEPLOYMENT.tenantId;
     get('#outlook-redirect-uri').value = redirectUri;
     formError('');
     get('#outlook-setup').showModal();
@@ -84,12 +87,14 @@ export function initializeOutlookAgenda(options = {}) {
   }
   function closeSetup() { get('#outlook-setup').close(); }
 
-  async function clearApplicationCache(instance, currentAccount) {
-    if (!instance) return;
-    try {
-      instance.setActiveAccount(null);
-      await instance.clearCache(currentAccount ? { account: currentAccount } : undefined);
-    } catch { /* Account and token references are discarded even if cache cleanup fails. */ }
+  function signedOut(pending = false) {
+    connectionGeneration++; account = null; needsReconnect = false; signingOut = pending; authBusy = pending; cancelRequests();
+    clearEvents('Connectez votre compte pour retrouver vos prochains rendez-vous.');
+    setStatus('Microsoft déconnecté de ce dashboard.'); renderControls();
+  }
+  function observeSignOut() {
+    unsubscribeSignOut?.();
+    unsubscribeSignOut = subscribeMicrosoftSignOut({ config, window: win }, signedOut);
   }
 
   async function prepareSdk() {
@@ -98,16 +103,15 @@ export function initializeOutlookAgenda(options = {}) {
     sdkLoading = true; pca = null;
     setStatus('Préparation de la connexion Microsoft 365…', 'loading'); renderControls();
     try {
-      const library = await loadSdk();
-      const application = new library.PublicClientApplication({
-        auth: { clientId: snapshot.clientId, authority: `https://login.microsoftonline.com/${snapshot.tenantId}`, redirectUri },
-        cache: { cacheLocation: 'memoryStorage' },
-        system: { loggerOptions: { piiLoggingEnabled: false, loggerCallback: () => {} } }
-      });
-      await application.initialize();
-      if (generation !== sdkGeneration) { await clearApplicationCache(application, null); return; }
+      const { application, sdk: library } = await getMicrosoftClient({ config: snapshot, redirectUri, loadSdk, window: win });
+      if (generation !== sdkGeneration) return;
       sdk = library; pca = application;
       setStatus(storageProblem ? 'Configuration disponible pour cette session. La sauvegarde locale est indisponible.' : 'Prêt à connecter votre calendrier en lecture seule.');
+      const restored = getRememberedMicrosoftAccount({ application, config: snapshot, storage });
+      if (restored) {
+        account = restored; needsReconnect = false; sdkLoading = false; renderControls();
+        await refresh();
+      }
     } catch {
       if (generation !== sdkGeneration) return;
       setStatus('La connexion Microsoft ne peut pas être préparée. Vérifiez votre connexion, puis réessayez.', 'error');
@@ -119,10 +123,11 @@ export function initializeOutlookAgenda(options = {}) {
   function authErrorMessage(error) {
     const code = error?.errorCode || '';
     if (['user_cancelled', 'user_canceled'].includes(code)) return 'Connexion annulée. Vous pourrez réessayer quand vous le souhaitez.';
-    if (['popup_window_error', 'empty_window_error', 'popup_window_timeout', 'monitor_popup_timeout'].includes(code)) return 'La fenêtre Microsoft n’a pas pu terminer la connexion. Autorisez les fenêtres de ce site ou ouvrez le dashboard directement dans votre navigateur.';
+    if (['popup_window_error', 'empty_window_error', 'popup_window_timeout', 'monitor_popup_timeout', 'timed_out'].includes(code)) return 'La fenêtre Microsoft n’a pas pu terminer la connexion. Autorisez les fenêtres de ce site ou ouvrez le dashboard directement dans votre navigateur.';
     if (['consent_required', 'access_denied'].includes(code)) return 'L’accès au calendrier n’a pas été autorisé. Votre organisation peut demander l’accord d’un administrateur.';
     if (code === 'interaction_in_progress') return 'Une connexion Microsoft est déjà en cours. Terminez ou fermez sa fenêtre avant de réessayer.';
     if (code === 'network_error') return 'Microsoft est momentanément inaccessible. Vérifiez votre connexion puis réessayez.';
+    if (code === 'dashboard_account_not_allowed') return 'Choisissez le compte personnellement affecté au dashboard pour connecter Outlook.';
     return 'La connexion Microsoft n’a pas abouti. Vérifiez les identifiants de l’application, son adresse de retour et les autorisations de votre organisation.';
   }
 
@@ -137,16 +142,20 @@ export function initializeOutlookAgenda(options = {}) {
     try {
       // No await before loginPopup: preserve the explicit user gesture for popup blockers.
       const response = await application.loginPopup({ scopes: [...OUTLOOK_SCOPES], redirectUri, prompt: 'select_account' });
-      if (generation !== connectionGeneration) { await clearApplicationCache(application, response.account); return; }
-      if (!response.account || response.account.tenantId?.toLowerCase() !== config.tenantId) throw new Error('Unexpected Microsoft tenant');
+      if (generation !== connectionGeneration) return;
+      if (!isDashboardMicrosoftAccount(response.account, config)) {
+        if (response.account && !isDashboardMicrosoftAccount(response.account, MICROSOFT_DEPLOYMENT)) {
+          try { await application.clearCache({ account: response.account }); } catch { /* Keep the authorized account's cache intact. */ }
+        }
+        throw Object.assign(new Error('Unexpected Microsoft account'), { errorCode: 'dashboard_account_not_allowed' });
+      }
       account = response.account; needsReconnect = false;
-      application.setActiveAccount(account);
+      rememberMicrosoftAccount({ application, account, config, storage });
       authBusy = false; renderControls();
       await refresh(response.accessToken || null);
     } catch (error) {
       if (generation !== connectionGeneration) return;
       account = null; needsReconnect = false;
-      await clearApplicationCache(application, null);
       clearEvents('Votre calendrier n’est pas connecté.');
       setStatus(authErrorMessage(error), 'error');
     } finally {
@@ -246,12 +255,7 @@ export function initializeOutlookAgenda(options = {}) {
   }
 
   async function disconnect() {
-    connectionGeneration++;
-    const oldAccount = account, application = pca;
-    account = null; needsReconnect = false; authBusy = false; cancelRequests();
-    clearEvents('Connectez votre compte pour retrouver vos prochains rendez-vous.');
-    setStatus('Calendrier déconnecté de ce dashboard.'); renderControls();
-    await clearApplicationCache(application, oldAccount);
+    await clearMicrosoftSession({ application: pca, account, config, storage, window: win });
   }
 
   get('#outlook-connect').addEventListener('click', connect);
@@ -266,15 +270,15 @@ export function initializeOutlookAgenda(options = {}) {
   get('#outlook-setup').addEventListener('close', () => { if (dialogTrigger?.isConnected) dialogTrigger.focus(); });
   get('#outlook-config-form').addEventListener('submit', async event => {
     event.preventDefault();
+    if (authBusy) return;
     const nextConfig = normalizeOutlookConfig({ clientId: get('#outlook-client-id').value, tenantId: get('#outlook-tenant-id').value });
     if (!nextConfig) { formError('Saisissez les deux identifiants au format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.'); return; }
     sdkGeneration++; connectionGeneration++;
-    const application = pca, oldAccount = account;
     cancelRequests(); account = null; pca = null; config = nextConfig; needsReconnect = false;
+    observeSignOut();
     try { storage?.setItem(OUTLOOK_CONFIG_KEY, JSON.stringify(config)); storageProblem = !storage; }
     catch { storageProblem = true; }
     closeSetup(); clearEvents('La configuration est prête. Connectez maintenant votre compte Microsoft 365.'); renderControls();
-    await clearApplicationCache(application, oldAccount);
     prepareSdk();
   });
   get('#outlook-copy-redirect').addEventListener('click', async () => {
@@ -282,8 +286,9 @@ export function initializeOutlookAgenda(options = {}) {
     catch { get('#outlook-redirect-uri').focus(); get('#outlook-redirect-uri').select(); formError('Copiez l’adresse sélectionnée avec Ctrl+C (ou ⌘C).'); }
   });
   get('#outlook-forget-config')?.addEventListener('click', async () => {
+    if (authBusy) return;
     sdkGeneration++;
-    await disconnect(); config = null; pca = null; sdkLoading = false;
+    await disconnect(); unsubscribeSignOut?.(); config = null; pca = null; sdkLoading = false;
     try { storage?.removeItem(OUTLOOK_CONFIG_KEY); } catch { storageProblem = true; }
     get('#outlook-client-id').value = ''; get('#outlook-tenant-id').value = '';
     formError(''); setStatus('Ajoutez la configuration Microsoft 365 pour connecter Outlook.'); renderControls();
@@ -296,7 +301,7 @@ export function initializeOutlookAgenda(options = {}) {
   clearEvents('Vos rendez-vous professionnels, au même endroit que vos priorités.');
   setStatus(config ? 'Préparation de la connexion Microsoft 365…' : storageProblem ? 'La configuration sauvegardée est indisponible. Configurez Outlook pour continuer.' : 'Une première configuration Microsoft 365 est nécessaire.');
   renderControls();
-  if (config) prepareSdk();
+  if (config) { observeSignOut(); prepareSdk(); }
   return { disconnect, refresh, showSetup };
 }
 
