@@ -30,6 +30,20 @@ Documentation : [MSAL Browser](https://learn.microsoft.com/en-us/entra/msal/java
 
 Microsoft MSAL Browser 5.27.0 et son redirect bridge sont empaquetés dans `vendor/`, avec leur licence. Pour les reconstruire : `npm ci`, puis `npm run build:auth`. Les versions sont verrouillées dans `package-lock.json`. Les fichiers déjà générés sont servis directement par GitHub Pages ; aucun build n’est nécessaire pour publier.
 
+## Tâches et tickets de l’intranet
+
+Le bloc « Mon intranet » lit les éléments attribués au compte connecté, au travers de l’API `https://intranet.isp-spi.ch/api/dashboard/v1/work`. Il affiche séparément les tâches et les tickets, leurs statuts, priorités et échéances. Chaque lien ouvre la fiche d’origine. Les éléments restent en lecture seule et ne sont jamais ajoutés aux tâches locales, sauvegardés dans localStorage ou inclus dans les exports JSON. Une déconnexion ou une erreur de récupération retire les éléments affichés.
+
+### Activation
+
+1. Déployer l’API de lecture de l’intranet et la configurer avec l’identité immuable du seul compte autorisé. L’API vérifie ce compte et ses attributions côté serveur, indépendamment du navigateur.
+2. Déclarer l’API dans Microsoft Entra avec une permission **déléguée** `api://<ID-application-API>/Dashboard.Read`, puis autoriser l’application SPA « dashboard » à demander cette permission. La permission Outlook `Calendars.ReadBasic` reste séparée : un jeton Microsoft Graph n’est jamais envoyé à l’intranet.
+3. Conserver la redirection SPA déjà enregistrée : `https://soaresbm1.github.io/dashboard-personnel/auth-redirect.html`. Autoriser uniquement l’origine `https://soaresbm1.github.io` dans les réglages CORS de l’API.
+4. Dans « Configurer la connexion intranet », enregistrer l’ID de l’application du dashboard, l’ID du locataire et l’ID de l’application API. Les identifiants Outlook existants sont proposés automatiquement dans le formulaire. Ce sont des identifiants publics ; aucun secret ou jeton n’est demandé.
+5. Choisir « Connecter l’intranet » avec le compte autorisé. Le navigateur doit pouvoir joindre l’intranet ; le réseau professionnel ou son VPN peut être nécessaire.
+
+Les connexions Outlook et intranet ont chacune leur cache MSAL en mémoire. Déconnecter l’intranet ne déconnecte pas les autres services Microsoft. Une actualisation de la page nécessite de se reconnecter. Le module refuse les redirections réseau et ne transmet son jeton qu’à l’adresse API fixe ci-dessus. L’accès est refusé par défaut tant que l’API n’est pas activée et correctement configurée.
+
 ## Publication avec GitHub Pages
 
 Les fichiers du site sont à la racine du dépôt. Dans **Settings → Pages**, choisissez **Deploy from a branch**, puis la branche **main** et le dossier **/ (root)**. Aucun build ni dépendance n’est nécessaire.

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build:auth": "node scripts/build-msal.mjs",
-    "check": "node --check app.js && node --check outlook.js && node --check outlook-core.mjs"
+    "check": "node --check app.js && node --check outlook.js && node --check outlook-core.mjs && node --check intranet.js && node --check intranet-core.mjs"
   },
   "dependencies": { "@azure/msal-browser": "5.27.0" },
   "devDependencies": { "esbuild": "0.28.2" }
