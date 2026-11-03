@@ -27,7 +27,7 @@
     <header class="topbar">
       <a class="brand" href="#overview" aria-label="Dashboard, vue d’ensemble"><svg class="icon" aria-hidden="true"><use href="#i-grid"/></svg><span>dashboard</span></a>
       <div class="topbar-right">
-        <span class="reading-label">Vue personnelle</span>
+        <time id="top-date" class="date-label"></time>
         <details class="connection-menu">
           <summary><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span>Connexions</span></summary>
           <div class="connection-options">
@@ -44,10 +44,7 @@
     </header>
 
     <main id="main">
-      <div class="page-heading" id="overview">
-        <div><p class="eyebrow">VOTRE ESPACE PERSONNEL</p><h1>Vue d’ensemble</h1><p class="page-description">L’essentiel de votre journée, en un coup d’œil.</p></div>
-        <time id="top-date" class="date-label"></time>
-      </div>
+      <h1 id="overview" class="sr-only">Vue d’ensemble</h1>
       <dl class="summary-grid" aria-label="Résumé">
         <div id="summary-agenda" class="summary-item">
           <dt>Prochain rendez-vous</dt>
@@ -80,7 +77,7 @@
             <button type="button" data-outlook-range="week" aria-pressed="false" disabled>Cette semaine</button>
           </div>
           <p id="outlook-status" class="service-status" role="status" aria-live="polite">Préparation de l’agenda…</p>
-          <div id="outlook-events" class="outlook-events" aria-busy="false"><p class="outlook-empty">Votre agenda apparaîtra ici.</p></div>
+          <div id="outlook-events" class="outlook-events scroll-list" role="region" aria-label="Rendez-vous" tabindex="0" aria-busy="false"><p class="outlook-empty">Votre agenda apparaîtra ici.</p></div>
           <div class="connection-panel"><button id="outlook-connect" class="button button-primary" type="button">Connecter Microsoft 365</button></div>
           <footer class="panel-footer"><a href="https://outlook.office.com/calendar/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir Outlook <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="outlook-last-updated"></span></footer>
         </section>
@@ -88,26 +85,24 @@
         <section id="intranet-work" class="panel work-panel" aria-labelledby="intranet-title">
           <header class="panel-header">
             <div><h2 id="intranet-title">Tâches et tickets</h2><p id="intranet-account" class="panel-account">Intranet</p></div>
+            <p class="sort-note" title="Bloquants et retards, échéances du jour, puis priorités">Par urgence</p>
             <button id="intranet-refresh" type="button" class="icon-button" aria-label="Actualiser les tâches et tickets intranet" title="Actualiser les tâches et tickets" hidden><svg class="icon" aria-hidden="true"><use href="#i-reset"/></svg></button>
           </header>
           <p id="intranet-status" class="service-status" role="status" aria-live="polite">Préparation de l’intranet…</p>
-          <p class="sort-note">Par urgence · bloquants et retards, échéances du jour, puis priorités.</p>
           <div id="intranet-items" class="work-lists" aria-busy="false">
             <section class="work-section" aria-labelledby="intranet-tasks-heading">
               <div class="work-section-heading"><h3 id="intranet-tasks-heading">Tâches</h3><span id="intranet-task-count" class="item-count"></span></div>
-              <div id="intranet-tasks"><p class="intranet-empty">Vos tâches apparaîtront ici.</p></div>
+              <div id="intranet-tasks" class="scroll-list" role="region" aria-label="Liste des tâches" tabindex="0"><p class="intranet-empty">Vos tâches apparaîtront ici.</p></div>
             </section>
             <section class="work-section" aria-labelledby="intranet-tickets-heading">
               <div class="work-section-heading"><h3 id="intranet-tickets-heading">Tickets</h3><span id="intranet-ticket-count" class="item-count"></span></div>
-              <div id="intranet-tickets"><p class="intranet-empty">Vos tickets apparaîtront ici.</p></div>
+              <div id="intranet-tickets" class="scroll-list" role="region" aria-label="Liste des tickets" tabindex="0"><p class="intranet-empty">Vos tickets apparaîtront ici.</p></div>
             </section>
           </div>
           <p id="intranet-limit" class="limit-note" hidden>Cet aperçu est limité. Retrouvez tous vos éléments dans l’intranet.</p>
           <div class="connection-panel"><button id="intranet-connect" class="button button-primary" type="button">Connecter l’intranet</button></div>
           <footer class="panel-footer"><a href="https://intranet.isp-spi.ch/intranet" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir l’intranet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="intranet-last-updated"></span></footer>
         </section>
-      </div>
-      <div class="overview-grid secondary-grid">
         <section id="mail-preview" class="panel" aria-labelledby="mail-title">
           <header class="panel-header">
             <div><h2 id="mail-title">Mails Outlook <span id="mail-unread-count" class="item-count"></span></h2><p id="mail-account" class="panel-account">Boîte de réception</p></div>
@@ -118,7 +113,7 @@
             <button type="button" data-mail-filter="important" aria-pressed="false" disabled>Importants</button>
           </div>
           <p id="mail-status" class="service-status" role="status" aria-live="polite">Préparation du courrier…</p>
-          <div id="mail-items" aria-busy="false"><p class="mail-empty">Vos mails apparaîtront ici.</p></div>
+          <div id="mail-items" class="scroll-list" role="region" aria-label="Liste des mails" tabindex="0" aria-busy="false"><p class="mail-empty">Vos mails apparaîtront ici.</p></div>
           <div class="connection-panel"><button id="mail-connect" class="button button-primary" type="button">Connecter les mails Outlook</button></div>
           <footer class="panel-footer"><a href="https://outlook.office.com/mail/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir Outlook <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="mail-last-updated"></span></footer>
         </section>
@@ -128,7 +123,7 @@
             <button id="news-refresh" type="button" class="icon-button" aria-label="Actualiser les actualités internes" title="Actualiser les actualités" hidden><svg class="icon" aria-hidden="true"><use href="#i-reset"/></svg></button>
           </header>
           <p id="news-status" class="service-status" role="status" aria-live="polite">Préparation des actualités…</p>
-          <div id="news-items" aria-busy="false"><p class="news-empty">Les annonces importantes apparaîtront ici.</p></div>
+          <div id="news-items" class="scroll-list" role="region" aria-label="Liste des annonces" tabindex="0" aria-busy="false"><p class="news-empty">Les annonces importantes apparaîtront ici.</p></div>
           <div class="connection-panel"><button id="news-connect" class="button button-primary" type="button">Connecter les actualités</button></div>
           <footer class="panel-footer"><a href="https://intranet.isp-spi.ch/intranet" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir l’intranet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="news-last-updated"></span></footer>
         </section>
