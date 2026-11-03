@@ -1,5 +1,6 @@
 import { INTRANET_CONFIG_KEY, INTRANET_DEPLOYMENT_IDS, normalizeIntranetConfig, intranetScope } from './intranet-core.mjs';
 import { NEWS_API_URL, normalizeNewsResponse, newsDateLabel } from './news-core.mjs';
+import { renderPublicationContent } from './news-content.mjs';
 import { retryAfterMilliseconds } from './outlook-core.mjs';
 import { getMicrosoftClient, getRememberedMicrosoftAccount, isDashboardMicrosoftAccount, rememberMicrosoftAccount,
   subscribeMicrosoftSignOut, clearMicrosoftSession } from './microsoft-session.mjs';
@@ -106,7 +107,7 @@ export function initializeInternalNews(options = {}) {
       heading.append(title, date); article.append(heading);
       const label = doc.createElement('p'); label.className = 'news-item-meta'; label.textContent = [item.isPinned ? 'Épinglée' : '', item.label].filter(Boolean).join(' · ');
       if (label.textContent) article.append(label);
-      if (item.content) { const content = doc.createElement('p'); content.className = 'news-item-content'; content.textContent = item.content; article.append(content); }
+      const content = renderPublicationContent(doc, item); if (content) article.append(content);
       fragment.append(article);
     }
     if (snapshot.news.length) get('#news-items').replaceChildren(fragment);
