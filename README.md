@@ -6,9 +6,9 @@ Une page unique de consultation regroupe l’agenda Outlook et les tâches et ti
 
 ## Vue compacte
 
-Sur ordinateur, le résumé et les accès rapides précèdent une grille unique : agenda à gauche, tâches et tickets côte à côte à droite, puis courrier et annonces en dessous. La date est regroupée dans l’en-tête. Les annonces montrent leur titre et leur date ; leur contenu complet s’ouvre dans l’intranet.
+Sur ordinateur, le résumé et les accès rapides précèdent une grille unique : agenda à gauche, tâches et tickets côte à côte à droite, puis courrier et dernière publication en dessous. La date est regroupée dans l’en-tête. La publication montre son titre et sa date ; son contenu complet s’ouvre dans l’intranet.
 
-À partir de 1040 × 650 pixels utiles, les quatre panneaux et leurs actions tiennent dans la hauteur de l’écran. Seules les listes longues défilent à l’intérieur de leur panneau, avec accès au clavier. Les données ne sont pas supprimées ni limitées davantage. Sur petit écran, après zoom ou en présence d’un message d’erreur, la page peut s’allonger pour conserver une lecture complète.
+À partir de 1040 × 650 pixels utiles, les quatre panneaux et leurs actions tiennent dans la hauteur de l’écran. Seules les listes longues défilent à l’intérieur de leur panneau, avec accès au clavier. Les éléments des listes chargées restent accessibles. Sur petit écran, après zoom ou en présence d’un message d’erreur, la page peut s’allonger pour conserver une lecture complète.
 
 ## Courrier, accès rapides et actualités internes
 
@@ -18,7 +18,7 @@ La permission `Mail.ReadBasic` s’ajoute à `Calendars.ReadBasic` dans l’insc
 
 Les accès rapides ouvrent le courrier Outlook, le calendrier, Teams et l’intranet, sans formulaire de création.
 
-Les actualités internes proviennent de `GET https://intranet.isp-spi.ch/api/dashboard/v1/news`, avec le jeton intranet `Dashboard.Read`, distinct du jeton Graph. Le serveur vérifie le propriétaire et applique les mêmes règles d’audience que le fil de l’intranet. Seules les publications importantes déjà publiées (épinglées, annonces ou rubrique Flash News) sont retenues ; les brouillons et publications futures sont exclus, y compris ceux de l’auteur. Le bloc compact affiche au plus cinq titres et dates, avec ouverture du post dans son fil d’origine ; les extraits reçus restent masqués dans cette vue. Une liste vide indique explicitement qu’aucune annonce importante n’est publiée. Le lien paginé peut se déplacer si le fil change avant son ouverture.
+Les actualités internes proviennent de `GET https://intranet.isp-spi.ch/api/dashboard/v1/latest-post`, avec le jeton intranet `Dashboard.Read`, distinct du jeton Graph. Le serveur vérifie le propriétaire et applique les mêmes règles d’audience que le fil de l’intranet. Le bloc présente uniquement la publication visible la plus récente, toutes rubriques confondues, selon sa date de publication puis son identifiant en cas d’égalité. Les épingles et niveaux d’importance ne modifient pas ce choix ; brouillons et publications futures restent exclus, y compris ceux de l’auteur. Le bloc compact affiche son titre et sa date avec un lien vers le post dans son fil d’origine ; l’extrait reçu reste masqué. Si aucune publication n’est disponible, un message l’indique. Le lien paginé peut se déplacer si le fil change avant son ouverture. L’ancien endpoint `/api/dashboard/v1/news` reste disponible pour les anciennes versions du dashboard.
 
 Ces deux aperçus utilisent la même actualisation automatique et la même déconnexion Microsoft que les blocs existants. Leur contenu reste uniquement en mémoire ; il n’est ni stocké dans le navigateur ni transmis à GitHub. Les erreurs de session retirent les données ; un incident réseau temporaire conserve le dernier affichage et son horodatage.
 

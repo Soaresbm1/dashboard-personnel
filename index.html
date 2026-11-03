@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f7f7f6">
-  <meta name="description" content="Votre agenda, vos mails, vos tâches et les annonces importantes de l’intranet, réunis dans une vue simple.">
+  <meta name="description" content="Votre agenda, vos mails, vos tâches et la dernière publication de l’intranet, réunis dans une vue simple.">
   <title>Dashboard — Vue d’ensemble</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
@@ -119,11 +119,11 @@
         </section>
         <section id="news-preview" class="panel" aria-labelledby="news-title">
           <header class="panel-header">
-            <div><h2 id="news-title">Actualités internes</h2><p id="news-account" class="panel-account">Annonces importantes de l’intranet</p></div>
+            <div><h2 id="news-title">Actualités internes</h2><p id="news-account" class="panel-account">Dernière publication de l’intranet</p></div>
             <button id="news-refresh" type="button" class="icon-button" aria-label="Actualiser les actualités internes" title="Actualiser les actualités" hidden><svg class="icon" aria-hidden="true"><use href="#i-reset"/></svg></button>
           </header>
           <p id="news-status" class="service-status" role="status" aria-live="polite">Préparation des actualités…</p>
-          <div id="news-items" class="scroll-list" role="region" aria-label="Liste des annonces" tabindex="0" aria-busy="false"><p class="news-empty">Les annonces importantes apparaîtront ici.</p></div>
+          <div id="news-items" class="scroll-list" role="region" aria-label="Dernière publication" tabindex="0" aria-busy="false"><p class="news-empty">La dernière publication apparaîtra ici.</p></div>
           <div class="connection-panel"><button id="news-connect" class="button button-primary" type="button">Connecter les actualités</button></div>
           <footer class="panel-footer"><a href="https://intranet.isp-spi.ch/intranet" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir l’intranet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="news-last-updated"></span></footer>
         </section>

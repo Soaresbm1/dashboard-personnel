@@ -38,7 +38,7 @@ export function initializeInternalNews(options = {}) {
     get('#news-refresh').hidden = !account;
     get('#news-refresh').disabled = !account || reconnect || preparing || authBusy || fetching || nowMs() < retryUntil;
     get('#news-disconnect').hidden = !account; get('#news-disconnect').disabled = authBusy;
-    get('#news-account').textContent = 'Annonces importantes de l’intranet';
+    get('#news-account').textContent = 'Dernière publication de l’intranet';
     get('#news-items').setAttribute('aria-busy', String(fetching));
   }
   function cancel(reset = false) {
@@ -48,7 +48,7 @@ export function initializeInternalNews(options = {}) {
   function signedOut(pending = false) {
     auto.stop(); sdkGeneration++; connectionGeneration++; account = null;
     reconnect = false; blocked = false; preparing = false; signingOut = !!pending; authBusy = !!pending; cancel(true);
-    clear('Connectez votre compte pour lire les annonces importantes.'); status('Microsoft déconnecté de ce dashboard.'); controls();
+    clear('Connectez votre compte pour lire la dernière publication.'); status('Microsoft déconnecté de ce dashboard.'); controls();
   }
   function bindSignOut() { unsubscribe?.(); unsubscribe = subscribeMicrosoftSignOut({ config, window: win }, signedOut); }
   function syncConfig() {
@@ -65,7 +65,7 @@ export function initializeInternalNews(options = {}) {
       application = client.application; sdk = client.sdk; preparing = false;
       account = getRememberedMicrosoftAccount({ application, config: snapshot, storage });
       if (account) { auto.start(); await refresh(); }
-      else status('Connectez l’intranet pour retrouver ses annonces importantes.');
+      else status('Connectez l’intranet pour retrouver sa dernière publication.');
     } catch { if (generation === sdkGeneration) status('La connexion à Microsoft est indisponible. Réessayez.', 'error'); }
     finally { if (generation === sdkGeneration) { preparing = false; controls(); } }
   }
@@ -110,13 +110,13 @@ export function initializeInternalNews(options = {}) {
       fragment.append(article);
     }
     if (snapshot.news.length) get('#news-items').replaceChildren(fragment);
-    else empty('Aucune annonce importante publiée pour le moment.');
+    else empty('Aucune publication disponible pour le moment.');
   }
   async function refresh(token = null, { automatic = false } = {}) {
     if (syncConfig() || !application || !account || reconnect || preparing || authBusy || fetching || nowMs() < retryUntil) return;
     lastAttempt = nowMs(); cancel(); const generation = requestGeneration, client = application, identity = account;
     const retain = automatic && !!lastGood; fetching = true; controller = new AbortController(); const abort = controller;
-    if (!retain) { clear('Chargement des annonces…'); status('Lecture de l’intranet…', 'loading'); } controls();
+    if (!retain) { clear('Chargement de la dernière publication…'); status('Lecture de l’intranet…', 'loading'); } controls();
     let timeout;
     try {
       const accessToken = token || (await client.acquireTokenSilent({ account: identity, scopes: [intranetScope(config)], redirectUri })).accessToken;
@@ -136,7 +136,7 @@ export function initializeInternalNews(options = {}) {
       if (!retain || lastGood.signature !== signature) render(data);
       lastGood = { data, signature, at }; blocked = false;
       get('#news-last-updated').textContent = `Actualisé le ${stamp(at)}`;
-      status(data.hasMore ? 'Les 5 dernières annonces importantes · lecture seule' : 'Annonces importantes publiées · lecture seule', 'connected'); auto.start();
+      status('Dernière publication visible · lecture seule', 'connected'); auto.start();
     } catch (error) {
       if (generation !== requestGeneration) return;
       const expired = sdk?.InteractionRequiredAuthError && error instanceof sdk.InteractionRequiredAuthError
@@ -148,7 +148,7 @@ export function initializeInternalNews(options = {}) {
       if (!keep) clear('Les actualités sont indisponibles pour le moment.');
       if (expired || forbidden) {
         auto.stop(); reconnect = !!expired; blocked = !!forbidden;
-        status(expired ? 'Reconnectez l’intranet pour retrouver les annonces.' : 'Ce compte n’est pas autorisé à consulter les annonces.', 'error');
+        status(expired ? 'Reconnectez l’intranet pour retrouver la dernière publication.' : 'Ce compte n’est pas autorisé à consulter cette publication.', 'error');
       } else {
         if (error.httpStatus === 429) {
           retryUntil = nowMs() + error.retryAfter; clearTimeout(retryTimer);
@@ -156,7 +156,7 @@ export function initializeInternalNews(options = {}) {
         }
         status(keep ? `Actualisation impossible. Dernières données reçues le ${stamp(lastGood.at)}.`
           : error.httpStatus === 404 || error.httpStatus === 503 ? 'La lecture des actualités n’est pas encore disponible sur l’intranet.'
-            : 'Les annonces ne peuvent pas être chargées. Réessayez depuis le réseau professionnel.', 'error');
+            : 'La publication ne peut pas être chargée. Réessayez depuis le réseau professionnel.', 'error');
       }
     } finally { clearTimeout(timeout); if (generation === requestGeneration) { fetching = false; controller = null; controls(); } }
   }
@@ -167,7 +167,7 @@ export function initializeInternalNews(options = {}) {
   get('#news-disconnect').addEventListener('click', disconnect);
   get('#intranet-config-form')?.addEventListener('submit', syncConfig);
   win.addEventListener?.('storage', storageChanged);
-  clear('Les annonces importantes apparaîtront ici après connexion.'); bindSignOut(); controls(); prepare();
+  clear('La dernière publication apparaîtra ici après connexion.'); bindSignOut(); controls(); prepare();
   return { refresh, connect, disconnect, dispose() { auto.dispose(); sdkGeneration++; connectionGeneration++; cancel(true); unsubscribe?.(); win.removeEventListener?.('storage', storageChanged); get('#intranet-config-form')?.removeEventListener?.('submit', syncConfig); } };
 }
 
