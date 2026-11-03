@@ -1,5 +1,5 @@
 import { OUTLOOK_CONFIG_KEY, normalizeOutlookConfig, retryAfterMilliseconds } from './outlook-core.mjs';
-import { INTRANET_CONFIG_KEY, INTRANET_API_URL, normalizeIntranetConfig, intranetScope, normalizeIntranetWork,
+import { INTRANET_CONFIG_KEY, INTRANET_API_URL, INTRANET_DEPLOYMENT_IDS, normalizeIntranetConfig, intranetScope, normalizeIntranetWork,
   intranetStatusLabel, intranetPriority, intranetDueLabel } from './intranet-core.mjs';
 
 // Work items, Microsoft accounts and access tokens stay in memory, outside dashboard exports.
@@ -61,9 +61,9 @@ export function initializeIntranetWork(options = {}) {
     dialogTrigger = doc.activeElement;
     let calendarConfig = null;
     try { calendarConfig = normalizeOutlookConfig(JSON.parse(storage?.getItem(OUTLOOK_CONFIG_KEY) || 'null')); } catch { /* The form remains available. */ }
-    get('#intranet-client-id').value = config?.clientId || calendarConfig?.clientId || '';
-    get('#intranet-tenant-id').value = config?.tenantId || calendarConfig?.tenantId || '';
-    get('#intranet-api-client-id').value = config?.apiClientId || '';
+    get('#intranet-client-id').value = config?.clientId || calendarConfig?.clientId || INTRANET_DEPLOYMENT_IDS.clientId;
+    get('#intranet-tenant-id').value = config?.tenantId || calendarConfig?.tenantId || INTRANET_DEPLOYMENT_IDS.tenantId;
+    get('#intranet-api-client-id').value = config?.apiClientId || INTRANET_DEPLOYMENT_IDS.apiClientId;
     formError(''); get('#intranet-setup').showModal();
     get('#intranet-setup-title').focus({ preventScroll: true }); get('#intranet-setup').scrollTop = 0;
   }
