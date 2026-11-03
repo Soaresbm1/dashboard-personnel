@@ -23,7 +23,7 @@ export function normalizeNewsResponse(value) {
     const id = text(String(item.id ?? ''), 100), title = text(item.title, 300);
     const publishedAt = typeof item.publishedAt === 'string' && /(?:Z|[+-]\d{2}:\d{2})$/.test(item.publishedAt) ? new Date(item.publishedAt) : null;
     if (!id || !title || !publishedAt || !Number.isFinite(+publishedAt)) continue;
-    const candidate = { id, title, excerpt: text(item.excerpt, 240), publishedAt, isPinned: item.isPinned === true,
+    const candidate = { id, title, content: typeof item.content === 'string' ? item.content.trim() : text(item.excerpt, 240), publishedAt, isPinned: item.isPinned === true,
       label: text(item.label, 80), url: safeNewsUrl(item.url) };
     if (!latest || newestFirst(candidate, latest) < 0) latest = candidate;
   }

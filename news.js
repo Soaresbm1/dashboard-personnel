@@ -106,7 +106,7 @@ export function initializeInternalNews(options = {}) {
       heading.append(title, date); article.append(heading);
       const label = doc.createElement('p'); label.className = 'news-item-meta'; label.textContent = [item.isPinned ? 'Épinglée' : '', item.label].filter(Boolean).join(' · ');
       if (label.textContent) article.append(label);
-      if (item.excerpt) { const excerpt = doc.createElement('p'); excerpt.className = 'news-item-excerpt'; excerpt.textContent = item.excerpt; article.append(excerpt); }
+      if (item.content) { const content = doc.createElement('p'); content.className = 'news-item-content'; content.textContent = item.content; article.append(content); }
       fragment.append(article);
     }
     if (snapshot.news.length) get('#news-items').replaceChildren(fragment);
