@@ -4,6 +4,18 @@ Un dashboard personnel statique, en français et adapté aux ordinateurs et tél
 
 Une page unique de consultation regroupe l’agenda Outlook et les tâches et tickets attribués dans l’intranet. Les deux listes de travail sont visibles simultanément, avec leurs statuts, priorités, échéances et liens d’origine. L’interface utilise des tons neutres et ne propose aucune création de contenu, projet, note, habitude ou minuteur. Les seuls réglages concernent les connexions Microsoft.
 
+## Courrier, accès rapides et actualités internes
+
+Le courrier présente les cinq derniers messages non lus de la boîte de réception, ou les cinq derniers messages d’importance haute, lus ou non. Le compteur du titre indique toujours le nombre total de non-lus de la boîte de réception. Les requêtes Microsoft Graph utilisent uniquement `Mail.ReadBasic` déléguée et sélectionnent les sujets, expéditeurs, dates, importance, état lu/non lu et liens Outlook. Aucun corps, aperçu du corps ou pièce jointe n’est demandé. Ouvrir un lien conduit dans Outlook ; le dashboard n’envoie ni ne modifie aucun mail.
+
+La permission `Mail.ReadBasic` s’ajoute à `Calendars.ReadBasic` dans l’inscription Entra de `dashboard`, avec consentement administrateur si l’affectation est obligatoire. L’accès reste limité au même propriétaire. Au chargement, la session existante est reprise silencieusement ; un consentement ou une validation Microsoft nécessaire demande un clic explicite, sans popup automatique. [Permission Microsoft Graph](https://learn.microsoft.com/en-us/graph/permissions-reference#mailreadbasic), [lecture des messages](https://learn.microsoft.com/en-us/graph/api/user-list-messages?view=graph-rest-1.0).
+
+Les accès rapides ouvrent le courrier Outlook, le calendrier, Teams et l’intranet, sans formulaire de création.
+
+Les actualités internes proviennent de `GET https://intranet.isp-spi.ch/api/dashboard/v1/news`, avec le jeton intranet `Dashboard.Read`, distinct du jeton Graph. Le serveur vérifie le propriétaire et applique les mêmes règles d’audience que le fil de l’intranet. Seules les publications importantes déjà publiées (épinglées, annonces ou rubrique Flash News) sont retenues ; les brouillons et publications futures sont exclus, y compris ceux de l’auteur. Le bloc affiche au plus cinq titres, extraits en texte brut et dates, avec ouverture du post dans son fil d’origine. Une liste vide indique explicitement qu’aucune annonce importante n’est publiée. Le lien paginé peut se déplacer si le fil change avant son ouverture.
+
+Ces deux aperçus utilisent la même actualisation automatique et la même déconnexion Microsoft que les blocs existants. Leur contenu reste uniquement en mémoire ; il n’est ni stocké dans le navigateur ni transmis à GitHub. Les erreurs de session retirent les données ; un incident réseau temporaire conserve le dernier affichage et son horodatage.
+
 ## Résumé et ordre de priorité
 
 Une ligne discrète présente le prochain rendez-vous de la période sélectionnée, le nombre de tâches en retard et le nombre de tickets prioritaires (bloquants ou priorité élevée). Un rendez-vous en cours est signalé, les événements terminés sont écartés et les titres privés restent masqués. Les compteurs concernent les éléments ouverts reçus ; une limite de l’API est indiquée dans le résumé. « — » signifie que les données ne sont pas disponibles, tandis que « 0 » correspond à une lecture réussie sans élément concerné.

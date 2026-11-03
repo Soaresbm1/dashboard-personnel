@@ -4,13 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f7f7f6">
-  <meta name="description" content="Une vue d’ensemble de votre agenda Outlook, de vos tâches et des tickets qui vous sont attribués.">
+  <meta name="description" content="Votre agenda, vos mails, vos tâches et les annonces importantes de l’intranet, réunis dans une vue simple.">
   <title>Dashboard — Vue d’ensemble</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <script src="app.js" type="module"></script>
   <script src="outlook.js" type="module"></script>
   <script src="intranet.js" type="module"></script>
+  <script src="mail.js" type="module"></script>
+  <script src="news.js" type="module"></script>
 </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:none">
@@ -32,8 +34,10 @@
             <p class="menu-label">MICROSOFT 365</p>
             <button id="outlook-configure" type="button">Paramètres Outlook</button>
             <button id="intranet-configure" type="button">Paramètres intranet</button>
-            <button id="outlook-disconnect" class="disconnect-button" type="button" title="Déconnecter l’agenda et l’intranet de ce dashboard" hidden>Déconnecter Microsoft</button>
-            <button id="intranet-disconnect" class="disconnect-button" type="button" title="Déconnecter l’agenda et l’intranet de ce dashboard" hidden>Déconnecter Microsoft</button>
+            <button id="outlook-disconnect" class="disconnect-button" type="button" title="Déconnecter tous les services Microsoft de ce dashboard" hidden>Déconnecter Microsoft</button>
+            <button id="intranet-disconnect" class="disconnect-button" type="button" title="Déconnecter tous les services Microsoft de ce dashboard" hidden>Déconnecter Microsoft</button>
+            <button id="mail-disconnect" class="disconnect-button" type="button" title="Déconnecter tous les services Microsoft de ce dashboard" hidden>Déconnecter Microsoft</button>
+            <button id="news-disconnect" class="disconnect-button" type="button" title="Déconnecter tous les services Microsoft de ce dashboard" hidden>Déconnecter Microsoft</button>
           </div>
         </details>
       </div>
@@ -41,7 +45,7 @@
 
     <main id="main">
       <div class="page-heading" id="overview">
-        <div><p class="eyebrow">VOTRE ESPACE PERSONNEL</p><h1>Vue d’ensemble</h1><p class="page-description">Votre agenda et ce qui vous est attribué.</p></div>
+        <div><p class="eyebrow">VOTRE ESPACE PERSONNEL</p><h1>Vue d’ensemble</h1><p class="page-description">L’essentiel de votre journée, en un coup d’œil.</p></div>
         <time id="top-date" class="date-label"></time>
       </div>
       <dl class="summary-grid" aria-label="Résumé">
@@ -58,6 +62,13 @@
           <dd><span id="summary-tickets-value" class="summary-value">—</span><span id="summary-tickets-detail" class="summary-detail">Chargement de l’intranet…</span></dd>
         </div>
       </dl>
+      <nav class="quick-access" aria-label="Accès rapides">
+        <span class="quick-access-label">Accès rapides</span>
+        <a href="https://outlook.office.com/mail/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Courrier Outlook <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
+        <a href="https://outlook.office.com/calendar/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Calendrier <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
+        <a href="https://teams.microsoft.com/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Teams <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
+        <a href="https://intranet.isp-spi.ch/intranet" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Intranet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
+      </nav>
       <div class="overview-grid">
         <section id="outlook-agenda" class="panel agenda-panel" aria-labelledby="outlook-title">
           <header class="panel-header">
@@ -94,6 +105,32 @@
           <p id="intranet-limit" class="limit-note" hidden>Cet aperçu est limité. Retrouvez tous vos éléments dans l’intranet.</p>
           <div class="connection-panel"><button id="intranet-connect" class="button button-primary" type="button">Connecter l’intranet</button></div>
           <footer class="panel-footer"><a href="https://intranet.isp-spi.ch/intranet" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir l’intranet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="intranet-last-updated"></span></footer>
+        </section>
+      </div>
+      <div class="overview-grid secondary-grid">
+        <section id="mail-preview" class="panel" aria-labelledby="mail-title">
+          <header class="panel-header">
+            <div><h2 id="mail-title">Mails Outlook <span id="mail-unread-count" class="item-count"></span></h2><p id="mail-account" class="panel-account">Boîte de réception</p></div>
+            <button id="mail-refresh" type="button" class="icon-button" aria-label="Actualiser les mails Outlook" title="Actualiser les mails" hidden><svg class="icon" aria-hidden="true"><use href="#i-reset"/></svg></button>
+          </header>
+          <div class="outlook-range" role="group" aria-label="Mails à afficher">
+            <button type="button" data-mail-filter="unread" aria-pressed="true" disabled>Non lus</button>
+            <button type="button" data-mail-filter="important" aria-pressed="false" disabled>Importants</button>
+          </div>
+          <p id="mail-status" class="service-status" role="status" aria-live="polite">Préparation du courrier…</p>
+          <div id="mail-items" aria-busy="false"><p class="mail-empty">Vos mails apparaîtront ici.</p></div>
+          <div class="connection-panel"><button id="mail-connect" class="button button-primary" type="button">Connecter les mails Outlook</button></div>
+          <footer class="panel-footer"><a href="https://outlook.office.com/mail/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir Outlook <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="mail-last-updated"></span></footer>
+        </section>
+        <section id="news-preview" class="panel" aria-labelledby="news-title">
+          <header class="panel-header">
+            <div><h2 id="news-title">Actualités internes</h2><p id="news-account" class="panel-account">Annonces importantes de l’intranet</p></div>
+            <button id="news-refresh" type="button" class="icon-button" aria-label="Actualiser les actualités internes" title="Actualiser les actualités" hidden><svg class="icon" aria-hidden="true"><use href="#i-reset"/></svg></button>
+          </header>
+          <p id="news-status" class="service-status" role="status" aria-live="polite">Préparation des actualités…</p>
+          <div id="news-items" aria-busy="false"><p class="news-empty">Les annonces importantes apparaîtront ici.</p></div>
+          <div class="connection-panel"><button id="news-connect" class="button button-primary" type="button">Connecter les actualités</button></div>
+          <footer class="panel-footer"><a href="https://intranet.isp-spi.ch/intranet" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir l’intranet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="news-last-updated"></span></footer>
         </section>
       </div>
       <footer class="page-footer"><span>Actualisation automatique · 1 min</span><span>Consultation en lecture seule</span></footer>

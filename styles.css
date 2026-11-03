@@ -45,7 +45,21 @@ h1, h2, h3, p { margin: 0; }
 .connection-options button { display: block; width: 100%; min-height: 42px; padding: 10px; border-radius: 5px; font-size: 12px; text-align: left; }
 .connection-options button:hover { background: var(--subtle); }
 .connection-options .disconnect-button { margin-top: 6px; border-top: 1px solid var(--line); border-radius: 0; }
-#outlook-disconnect:not([hidden]) + #intranet-disconnect { display: none; }
+.connection-options .disconnect-button:not([hidden]) ~ .disconnect-button { display: none; }
+.quick-access { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 25px; padding: 0 0 25px; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.quick-access-label { margin-right: 3px; color: var(--ink); font-weight: 600; }
+.quick-access a { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; }
+.quick-access .icon { width: 12px; height: 12px; }
+.secondary-grid { margin-top: 24px; }
+.mail-empty, .news-empty { margin: 0; padding: 18px 0 22px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.mail-item, .news-item { padding: 15px 0; border-top: 1px solid #eeeeeb; }
+.mail-item-heading, .news-item-heading { display: flex; align-items: baseline; gap: 14px; justify-content: space-between; }
+.mail-item-subject, .news-item-title { min-width: 0; font-size: 13px; font-weight: 500; line-height: 1.6; overflow-wrap: anywhere; }
+.mail-item-date, .news-item-date { flex-shrink: 0; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; line-height: 1.7; }
+.mail-item-from, .mail-item-meta, .news-item-meta { display: block; margin-top: 6px; color: var(--muted); font-size: 10px; line-height: 1.6; overflow-wrap: anywhere; }
+.news-item-excerpt { margin-top: 8px; color: #60605d; font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; }
+.mail-item.is-important .mail-item-subject { font-weight: 600; }
+.panel-header h2 .item-count { margin-left: 6px; vertical-align: middle; }
 .page-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; padding: 53px 0 32px; }
 .summary-grid { display: grid; grid-template-columns: 1.3fr 1fr 1fr; margin: 0 0 26px; padding: 22px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .summary-item { min-width: 0; padding: 0 25px; }
@@ -140,6 +154,11 @@ h1 { font-size: clamp(28px, 3vw, 36px); font-weight: 550; letter-spacing: -1.15p
   .panel { padding: 24px 24px 0; }
 }
 @media (max-width: 520px) {
+  .quick-access { gap: 6px 18px; padding-bottom: 20px; }
+  .quick-access-label { flex-basis: 100%; }
+  .quick-access a { min-height: 38px; }
+  .mail-item-heading, .news-item-heading { flex-wrap: wrap; gap: 4px; }
+  .mail-item-subject, .news-item-title { flex-basis: 100%; }
   .summary-grid { grid-template-columns: 1fr 1fr; padding: 0; margin-bottom: 22px; }
   .summary-item { padding: 17px 0; }
   .summary-item:first-child { grid-column: 1 / -1; border-bottom: 1px solid var(--line); }
