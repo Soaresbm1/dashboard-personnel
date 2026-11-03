@@ -1,4 +1,4 @@
-'use strict';
+import { createAutoRefresh } from './auto-refresh.mjs';
 
 // The read-only overview does not read or modify existing personal browser data.
 function updateDashboardDate() {
@@ -13,6 +13,8 @@ function showOverview() {
   if (location.hash && !['#overview', '#main'].includes(location.hash)) history.replaceState(null, '', `${location.pathname}${location.search}#overview`);
 }
 updateDashboardDate();
+const dateRefresh = createAutoRefresh({ document, window, refresh: updateDashboardDate, canRefresh: () => true });
+dateRefresh.start();
 showOverview();
 window.addEventListener('hashchange', showOverview);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) updateDashboardDate(); });

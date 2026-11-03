@@ -4,6 +4,12 @@ Un dashboard personnel statique, en français et adapté aux ordinateurs et tél
 
 Une page unique de consultation regroupe l’agenda Outlook et les tâches et tickets attribués dans l’intranet. Les deux listes de travail sont visibles simultanément, avec leurs statuts, priorités, échéances et liens d’origine. L’interface utilise des tons neutres et ne propose aucune création de contenu, projet, note, habitude ou minuteur. Les seuls réglages concernent les connexions Microsoft.
 
+## Actualisation automatique
+
+L’agenda et les deux listes de travail se mettent à jour chaque minute lorsque la page est visible et le navigateur en ligne. Le retour sur l’onglet ou le rétablissement du réseau déclenche une mise à jour, avec au moins cinq secondes entre deux tentatives rapprochées. Les demandes en cours ne sont pas doublées et les délais `Retry-After` sont respectés.
+
+Les données déjà chargées restent affichées pendant une mise à jour automatique. En cas d’incident temporaire, le dashboard indique que le dernier affichage est conservé et garde son horodatage précédent. Une session expirée ou un refus d’accès retire les données et demande une reconnexion explicite, sans popup automatique. Les boutons d’actualisation manuelle restent disponibles. La date de la page et la période de l’agenda suivent aussi le changement de jour.
+
 ## Données personnelles
 
 Les données de travail proviennent uniquement d’Outlook et de l’intranet ; aucun contenu de démonstration n’est affiché. Les éventuelles anciennes données personnelles sous la clé `mon-espace-v1` restent intactes dans le navigateur, sans être utilisées ni modifiées par cette vue de consultation.

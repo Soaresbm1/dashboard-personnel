@@ -3,6 +3,7 @@ import { INTRANET_CONFIG_KEY, INTRANET_API_URL, INTRANET_DEPLOYMENT_IDS, normali
   intranetStatusLabel, intranetPriority, intranetDueLabel } from './intranet-core.mjs';
 import { getMicrosoftClient, isDashboardMicrosoftAccount, getRememberedMicrosoftAccount, rememberMicrosoftAccount,
   clearMicrosoftSession, subscribeMicrosoftSignOut } from './microsoft-session.mjs';
+import { createAutoRefresh } from './auto-refresh.mjs';
 
 // Work items stay in memory. Microsoft manages the persistent sign-in cache separately.
 export function initializeIntranetWork(options = {}) {
@@ -12,6 +13,7 @@ export function initializeIntranetWork(options = {}) {
   const fetcher = options.fetch || globalThis.fetch.bind(globalThis);
   const loadSdk = options.loadSdk || (() => import('./vendor/msal.js'));
   const now = options.now || (() => new Date());
+  const nowMs = options.autoRefreshOptions?.nowMs || Date.now;
   const redirectUri = new URL('auth-redirect.html', doc.baseURI).href;
   let storage = null, config = null, storageProblem = false;
   try {
@@ -26,6 +28,13 @@ export function initializeIntranetWork(options = {}) {
   let sdkGeneration = 0, connectionGeneration = 0, requestGeneration = 0;
   let controller = null, retryTimer = null, retryUntil = 0, dialogTrigger = null;
   let unsubscribeSignOut = null;
+  let lastRequestStartedAt = -Infinity, lastGood = null;
+  const autoRefresh = (options.autoRefreshFactory || createAutoRefresh)({
+    ...options.autoRefreshOptions, document: doc, window: win,
+    refresh: () => refresh(null, { automatic: true }),
+    canRefresh: () => !!account && !!pca && !sdkLoading && !authBusy && !fetching && !needsReconnect,
+    retryAt: () => retryUntil, lastAttemptAt: () => lastRequestStartedAt
+  });
 
   function setStatus(message, state = '') {
     get('#intranet-status').textContent = message; get('#intranet-status').dataset.state = state;
@@ -35,10 +44,27 @@ export function initializeIntranetWork(options = {}) {
     get(selector).replaceChildren(element);
   }
   function clearWork(message) {
-    work = null; get('#intranet-last-updated').textContent = '';
+    work = null; lastGood = null; get('#intranet-last-updated').textContent = '';
     empty(message, '#intranet-tasks'); empty(message, '#intranet-tickets');
     get('#intranet-task-count').textContent = ''; get('#intranet-ticket-count').textContent = '';
     get('#intranet-limit').hidden = true;
+  }
+  function updatedAtLabel(date) {
+    return new Intl.DateTimeFormat('fr-CH', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(date);
+  }
+  function staleWarning(message) {
+    return lastGood ? `${message} Dernières données reçues le ${updatedAtLabel(lastGood.at)}.` : message;
+  }
+  function workSignature(value, anchor) {
+    const today = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
+    const rows = (values, tickets) => values.map(item => {
+      const priority = intranetPriority(item.priority);
+      return [tickets && item.key ? `${item.key} · ${item.title}` : item.title, item.url,
+        intranetStatusLabel(item.status), priority.label, priority.level,
+        intranetDueLabel(item.dueAt, anchor), !!item.dueAt && item.dueAt < today];
+    });
+    return JSON.stringify([[anchor.getFullYear(), anchor.getMonth(), anchor.getDate()],
+      rows(value.tasks, false), rows(value.tickets, true), value.tasksHasMore, value.ticketsHasMore]);
   }
   function controls() {
     const connected = !!account, connect = get('#intranet-connect');
@@ -46,7 +72,7 @@ export function initializeIntranetWork(options = {}) {
     connect.disabled = sdkLoading || authBusy;
     connect.textContent = !config ? 'Configurer l’intranet' : signingOut ? 'Déconnexion…' : sdkLoading ? 'Préparation…' : authBusy ? 'Connexion…' : needsReconnect ? 'Reconnecter l’intranet' : 'Connecter l’intranet';
     get('#intranet-refresh').hidden = !connected;
-    get('#intranet-refresh').disabled = !connected || needsReconnect || fetching || authBusy || Date.now() < retryUntil;
+    get('#intranet-refresh').disabled = !connected || needsReconnect || fetching || authBusy || nowMs() < retryUntil;
     get('#intranet-disconnect').hidden = !connected; get('#intranet-disconnect').disabled = authBusy;
     get('#intranet-configure').disabled = authBusy;
     get('#intranet-account').textContent = connected ? work?.displayName || account.username || 'Compte Microsoft connecté' : 'Tâches et tickets qui vous sont attribués';
@@ -70,6 +96,7 @@ export function initializeIntranetWork(options = {}) {
   }
   function closeSetup() { get('#intranet-setup').close(); }
   function clearSignedOutView(pending = false) {
+    autoRefresh.stop();
     connectionGeneration++; account = null; needsReconnect = false; signingOut = Boolean(pending); authBusy = signingOut; cancelRequests();
     clearWork('Connectez votre compte pour retrouver vos tâches et vos tickets.');
     setStatus(signingOut ? 'Déconnexion de Microsoft en cours…' : 'Microsoft est déconnecté de ce dashboard.'); controls();
@@ -90,6 +117,7 @@ export function initializeIntranetWork(options = {}) {
       sdkLoading = false;
       if (restored) {
         account = restored; needsReconnect = false; controls();
+        autoRefresh.start();
         await refresh();
       } else setStatus(storageProblem ? 'Configuration disponible pour cette session. La sauvegarde locale est indisponible.' : 'Connectez votre compte pour lire vos tâches et vos tickets.');
     } catch {
@@ -110,6 +138,7 @@ export function initializeIntranetWork(options = {}) {
     if (sdkLoading || authBusy) return;
     if (!pca) { await prepareSdk(); return; }
     const generation = ++connectionGeneration, application = pca, snapshot = { ...config };
+    autoRefresh.stop();
     authBusy = true; cancelRequests(); clearWork('Connexion sécurisée à Microsoft…');
     setStatus('Terminez la connexion dans la fenêtre Microsoft.', 'loading'); controls();
     try {
@@ -125,15 +154,16 @@ export function initializeIntranetWork(options = {}) {
       if (!response.accessToken) throw new Error('Invalid account response');
       rememberMicrosoftAccount({ application, account: response.account, config: snapshot, storage });
       account = response.account; needsReconnect = false;
-      authBusy = false; controls(); await refresh(response.accessToken);
+      authBusy = false; controls(); autoRefresh.start(); await refresh(response.accessToken);
     } catch (error) {
       if (generation !== connectionGeneration) return;
       account = null; needsReconnect = false;
       clearWork('Vos tâches et vos tickets ne sont pas connectés.'); setStatus(connectionError(error), 'error');
     } finally { if (generation === connectionGeneration) { authBusy = false; controls(); } }
   }
-  function renderList(values, kind, selector) {
+  function renderList(values, kind, selector, anchor) {
     const fragment = doc.createDocumentFragment();
+    const today = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
     for (const item of values) {
       const row = doc.createElement('article'); row.className = 'intranet-item';
       const priority = intranetPriority(item.priority); row.dataset.priority = priority.level;
@@ -145,29 +175,33 @@ export function initializeIntranetWork(options = {}) {
       const status = doc.createElement('span'); status.textContent = intranetStatusLabel(item.status); details.append(status);
       if (priority.label) { const badge = doc.createElement('span'); badge.className = 'intranet-priority'; badge.textContent = priority.label; details.append(badge); }
       body.append(title, details);
-      const due = doc.createElement('span'); due.className = 'intranet-due'; due.textContent = intranetDueLabel(item.dueAt, now());
-      const today = now(); today.setHours(0, 0, 0, 0); if (item.dueAt && item.dueAt < today) due.dataset.overdue = 'true';
+      const due = doc.createElement('span'); due.className = 'intranet-due'; due.textContent = intranetDueLabel(item.dueAt, anchor);
+      if (item.dueAt && item.dueAt < today) due.dataset.overdue = 'true';
       row.append(body, due); fragment.append(row);
     }
     if (values.length) get(selector).replaceChildren(fragment);
     else empty(kind === 'tasks' ? 'Aucune tâche ouverte ne vous est attribuée.' : 'Aucun ticket ouvert ne vous est attribué.', selector);
   }
-  function renderItems() {
+  function renderItems(anchor) {
     if (!work) return;
-    renderList(work.tasks, 'tasks', '#intranet-tasks');
-    renderList(work.tickets, 'tickets', '#intranet-tickets');
+    renderList(work.tasks, 'tasks', '#intranet-tasks', anchor);
+    renderList(work.tickets, 'tickets', '#intranet-tickets', anchor);
     get('#intranet-task-count').textContent = `${work.tasks.length}${work.tasksHasMore ? '+' : ''}`;
     get('#intranet-ticket-count').textContent = `${work.tickets.length}${work.ticketsHasMore ? '+' : ''}`;
     const limitedKinds = [work.tasksHasMore ? 'tâches' : '', work.ticketsHasMore ? 'tickets' : ''].filter(Boolean);
     get('#intranet-limit').hidden = limitedKinds.length === 0;
     if (limitedKinds.length) get('#intranet-limit').textContent = `L’aperçu des ${limitedKinds.join(' et ')} est limité. Ouvrez l’intranet pour tout consulter.`;
   }
-  async function refresh(accessToken = null) {
-    if (!account || !pca || needsReconnect || authBusy || Date.now() < retryUntil) return;
+  async function refresh(accessToken = null, { automatic = false } = {}) {
+    if (!account || !pca || needsReconnect || authBusy || fetching || nowMs() < retryUntil) return;
+    lastRequestStartedAt = nowMs();
     cancelRequests();
     const generation = requestGeneration, application = pca, signedInAccount = account;
     const abortController = new AbortController(); controller = abortController;
-    fetching = true; clearWork('Chargement de vos tâches et de vos tickets…'); setStatus('Lecture de l’intranet…', 'loading'); controls();
+    const retainingWork = automatic && !!work;
+    fetching = true;
+    if (!retainingWork) { clearWork('Chargement de vos tâches et de vos tickets…'); setStatus('Lecture de l’intranet…', 'loading'); }
+    controls();
     let timeout;
     try {
       const token = accessToken || (await application.acquireTokenSilent({ account: signedInAccount, scopes: [intranetScope(config)], redirectUri })).accessToken;
@@ -178,30 +212,52 @@ export function initializeIntranetWork(options = {}) {
         signal: abortController.signal, cache: 'no-store', credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer' });
       if (generation !== requestGeneration) return;
       if (!response.ok) { const error = new Error('Intranet request failed'); error.httpStatus = response.status;
-        if (response.status === 429) error.retryAfter = retryAfterMilliseconds(response.headers.get('Retry-After')); throw error; }
-      const body = await response.json();
+        if (response.status === 429) error.retryAfter = retryAfterMilliseconds(response.headers.get('Retry-After'), nowMs()); throw error; }
+      let nextWork;
+      try { nextWork = normalizeIntranetWork(await response.json()); }
+      catch { throw Object.assign(new Error('Invalid intranet response'), { unsafeResponse: true }); }
       if (generation !== requestGeneration) return;
-      work = normalizeIntranetWork(body); renderItems();
-      get('#intranet-last-updated').textContent = `Actualisé à ${new Intl.DateTimeFormat('fr-CH', { hour: '2-digit', minute: '2-digit' }).format(now())}`;
+      const currentTime = now(), signature = workSignature(nextWork, currentTime);
+      const unchanged = retainingWork && lastGood?.signature === signature;
+      work = nextWork;
+      if (!unchanged) renderItems(currentTime);
+      lastGood = { at: currentTime, signature };
+      get('#intranet-last-updated').textContent = `Actualisé le ${updatedAtLabel(currentTime)}`;
       setStatus('Vos éléments attribués · lecture seule', 'connected');
+      autoRefresh.start();
     } catch (error) {
       if (generation !== requestGeneration) return;
-      clearWork('Vos tâches et vos tickets sont indisponibles pour le moment.');
       const interactionRequired = sdk?.InteractionRequiredAuthError && error instanceof sdk.InteractionRequiredAuthError;
+      const transientError = !error.unsafeResponse && (error.httpStatus === 429 || error.name === 'AbortError'
+        || !error.httpStatus && (error instanceof TypeError || ['network_error', 'no_network_connectivity', 'post_request_failed', 'get_request_failed', 'timed_out'].includes(error.errorCode)));
+      const keepPrevious = retainingWork && transientError && !interactionRequired;
+      if (!keepPrevious) clearWork('Vos tâches et vos tickets sont indisponibles pour le moment.');
       if (interactionRequired || ['interaction_required', 'login_required', 'consent_required'].includes(error?.errorCode) || error.httpStatus === 401) {
+        autoRefresh.stop();
         needsReconnect = true; setStatus('Votre session doit être renouvelée. Reconnectez l’intranet pour afficher vos éléments.', 'error');
       } else if (error.httpStatus === 403) {
+        autoRefresh.stop();
         account = null; needsReconnect = false;
         setStatus('Ce compte n’est pas autorisé à consulter cette API. Utilisez le compte personnellement affecté au dashboard.', 'error');
       } else if (error.httpStatus === 503) setStatus('La connexion n’est pas encore activée sur l’intranet. Réessayez après son activation.', 'error');
       else if (error.httpStatus === 429) {
-        retryUntil = Date.now() + error.retryAfter; setStatus(`L’intranet limite temporairement les demandes. Réessayez dans ${Math.ceil(error.retryAfter / 1000)} secondes.`, 'error');
-        retryTimer = setTimeout(() => { retryUntil = 0; setStatus('Vous pouvez maintenant actualiser l’intranet.'); controls(); }, error.retryAfter);
-      } else if (error.name === 'AbortError') setStatus('L’intranet met trop de temps à répondre. Réessayez avec Actualiser.', 'error');
+        retryUntil = nowMs() + error.retryAfter;
+        setStatus(staleWarning(`L’intranet limite temporairement les demandes. ${keepPrevious ? 'Le dernier affichage est conservé. ' : ''}Nouvelle tentative possible dans ${Math.ceil(error.retryAfter / 1000)} secondes.`), 'error');
+        retryTimer = setTimeout(() => {
+          retryUntil = 0;
+          setStatus(keepPrevious ? staleWarning('Le dernier affichage est conservé. Une nouvelle actualisation sera tentée automatiquement.') : 'Vous pouvez maintenant actualiser l’intranet.', keepPrevious ? 'error' : '');
+          controls();
+        }, error.retryAfter);
+        retryTimer?.unref?.();
+      } else if (keepPrevious) setStatus(staleWarning(error.name === 'AbortError' || error.errorCode === 'timed_out'
+        ? 'L’actualisation prend trop de temps. Le dernier affichage est conservé.'
+        : 'Actualisation impossible. Le dernier affichage est conservé. Vérifiez votre connexion au réseau professionnel.'), 'error');
+      else if (error.name === 'AbortError') setStatus('L’intranet met trop de temps à répondre. Réessayez avec Actualiser.', 'error');
       else setStatus('L’intranet ne répond pas correctement. Vérifiez votre connexion au réseau professionnel puis réessayez.', 'error');
     } finally { clearTimeout(timeout); if (generation === requestGeneration) { fetching = false; controller = null; controls(); } }
   }
   async function disconnect() {
+    autoRefresh.stop();
     const application = pca, oldAccount = account;
     connectionGeneration++;
     account = null; needsReconnect = false; signingOut = true; authBusy = true; cancelRequests();
@@ -222,6 +278,7 @@ export function initializeIntranetWork(options = {}) {
     const next = normalizeIntranetConfig({ clientId: get('#intranet-client-id').value, tenantId: get('#intranet-tenant-id').value, apiClientId: get('#intranet-api-client-id').value });
     if (!next) { formError('Renseignez les trois identifiants au format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.'); return; }
     sdkGeneration++; connectionGeneration++;
+    autoRefresh.stop();
     cancelRequests(); account = null; pca = null; config = next; needsReconnect = false;
     bindSignOut();
     try { storage?.setItem(INTRANET_CONFIG_KEY, JSON.stringify(config)); storageProblem = !storage; } catch { storageProblem = true; }
