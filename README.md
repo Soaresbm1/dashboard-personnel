@@ -1,18 +1,16 @@
-# Mon espace — Dashboard personnel
+# Dashboard — Vue d’ensemble
 
 Un dashboard personnel statique, en français et adapté aux ordinateurs et téléphones.
 
-Il regroupe les tâches et leurs échéances, les projets et leur progression, les habitudes quotidiennes, les notes, les raccourcis et un minuteur de concentration.
+Une page unique de consultation regroupe l’agenda Outlook et les tâches et tickets attribués dans l’intranet. Les deux listes de travail sont visibles simultanément, avec leurs statuts, priorités, échéances et liens d’origine. L’interface utilise des tons neutres et ne propose aucune création de contenu, projet, note, habitude ou minuteur. Les seuls réglages concernent les connexions Microsoft.
 
 ## Données personnelles
 
-Les tâches, projets, habitudes et notes sont sauvegardés uniquement dans le navigateur utilisé (localStorage), sans synchronisation entre appareils. Le menu « Personnaliser » permet d’exporter ou d’importer une copie JSON. Un changement d’adresse du site utilise un espace de sauvegarde distinct : exportez vos données avant de les transférer sur la nouvelle adresse.
-
-Les tâches et habitudes initiales sont des suggestions à personnaliser.
+Les données de travail proviennent uniquement d’Outlook et de l’intranet ; aucun contenu de démonstration n’est affiché. Les éventuelles anciennes données personnelles sous la clé `mon-espace-v1` restent intactes dans le navigateur, sans être utilisées ni modifiées par cette vue de consultation.
 
 ## Agenda Outlook professionnel
 
-Le bloc « Mon agenda Outlook » permet une connexion Microsoft 365 en lecture seule et affiche les événements du jour ou de la semaine du calendrier principal, y compris les occurrences de réunions récurrentes. Le site interroge directement Microsoft Graph après connexion. Les événements restent uniquement en mémoire ; ils ne sont ni envoyés à GitHub ni inclus dans les exports JSON. Microsoft MSAL conserve les informations de connexion dans son cache localStorage pour retrouver le compte et renouveler les jetons automatiquement après rechargement. Le code du dashboard ne copie jamais les jetons dans ses propres données ou exports.
+Le panneau « Agenda » permet une connexion Microsoft 365 en lecture seule et affiche les événements du jour ou de la semaine du calendrier principal, y compris les occurrences de réunions récurrentes. Le site interroge directement Microsoft Graph après connexion. Les événements restent uniquement en mémoire ; ils ne sont ni envoyés à GitHub ni inclus dans des exports. Microsoft MSAL conserve les informations de connexion dans son cache localStorage pour retrouver le compte et renouveler les jetons automatiquement après rechargement. Le code du dashboard ne copie jamais les jetons dans ses propres données. Le menu « Connexions » regroupe les paramètres Outlook, les paramètres intranet et la déconnexion Microsoft commune.
 
 ### Configuration Microsoft Entra
 
@@ -36,7 +34,7 @@ Microsoft MSAL Browser 5.27.0 et son redirect bridge sont empaquetés dans `vend
 
 ## Tâches et tickets de l’intranet
 
-Le bloc « Mon intranet » lit les éléments attribués au compte connecté, au travers de l’API `https://intranet.isp-spi.ch/api/dashboard/v1/work`. Il affiche séparément les tâches et les tickets, leurs statuts, priorités et échéances. Chaque lien ouvre la fiche d’origine. Les éléments restent en lecture seule et ne sont jamais ajoutés aux tâches locales, sauvegardés dans localStorage ou inclus dans les exports JSON. Une déconnexion ou une erreur de récupération retire les éléments affichés.
+Le panneau « Tâches et tickets » lit les éléments attribués au compte connecté, au travers de l’API `https://intranet.isp-spi.ch/api/dashboard/v1/work`. Les deux listes sont visibles simultanément avec leurs statuts, priorités et échéances. Chaque lien ouvre la fiche d’origine. Les éléments restent en lecture seule et ne sont jamais ajoutés aux tâches locales ni sauvegardés dans localStorage. Une déconnexion ou une erreur de récupération retire les éléments affichés.
 
 ### Activation
 

@@ -21,7 +21,7 @@ export function initializeIntranetWork(options = {}) {
     if (saved && !config) storageProblem = true;
   } catch { storageProblem = true; }
   config ||= normalizeIntranetConfig(INTRANET_DEPLOYMENT_IDS);
-  let pca = null, sdk = null, account = null, work = null, selectedKind = 'tasks';
+  let pca = null, sdk = null, account = null, work = null;
   let sdkLoading = false, authBusy = false, fetching = false, needsReconnect = false, signingOut = false;
   let sdkGeneration = 0, connectionGeneration = 0, requestGeneration = 0;
   let controller = null, retryTimer = null, retryUntil = 0, dialogTrigger = null;
@@ -30,12 +30,13 @@ export function initializeIntranetWork(options = {}) {
   function setStatus(message, state = '') {
     get('#intranet-status').textContent = message; get('#intranet-status').dataset.state = state;
   }
-  function empty(message) {
+  function empty(message, selector) {
     const element = doc.createElement('p'); element.className = 'intranet-empty'; element.textContent = message;
-    get('#intranet-items').replaceChildren(element);
+    get(selector).replaceChildren(element);
   }
   function clearWork(message) {
-    work = null; get('#intranet-last-updated').textContent = ''; empty(message);
+    work = null; get('#intranet-last-updated').textContent = '';
+    empty(message, '#intranet-tasks'); empty(message, '#intranet-tickets');
     get('#intranet-task-count').textContent = ''; get('#intranet-ticket-count').textContent = '';
     get('#intranet-limit').hidden = true;
   }
@@ -50,10 +51,6 @@ export function initializeIntranetWork(options = {}) {
     get('#intranet-configure').disabled = authBusy;
     get('#intranet-account').textContent = connected ? work?.displayName || account.username || 'Compte Microsoft connecté' : 'Tâches et tickets qui vous sont attribués';
     get('#intranet-items').setAttribute('aria-busy', String(fetching));
-    doc.querySelectorAll('[data-intranet-kind]').forEach(button => {
-      button.disabled = !work || fetching || authBusy;
-      button.setAttribute('aria-pressed', String(button.dataset.intranetKind === selectedKind));
-    });
     get('#intranet-forget-config').hidden = !config; get('#intranet-forget-config').disabled = authBusy;
   }
   function cancelRequests() {
@@ -135,15 +132,14 @@ export function initializeIntranetWork(options = {}) {
       clearWork('Vos tâches et vos tickets ne sont pas connectés.'); setStatus(connectionError(error), 'error');
     } finally { if (generation === connectionGeneration) { authBusy = false; controls(); } }
   }
-  function renderItems() {
-    if (!work) return;
-    const values = work[selectedKind], fragment = doc.createDocumentFragment();
+  function renderList(values, kind, selector) {
+    const fragment = doc.createDocumentFragment();
     for (const item of values) {
       const row = doc.createElement('article'); row.className = 'intranet-item';
       const priority = intranetPriority(item.priority); row.dataset.priority = priority.level;
       const body = doc.createElement('div'); body.className = 'intranet-item-body';
       const title = doc.createElement(item.url ? 'a' : 'strong'); title.className = 'intranet-item-title';
-      title.textContent = selectedKind === 'tickets' && item.key ? `${item.key} · ${item.title}` : item.title;
+      title.textContent = kind === 'tickets' && item.key ? `${item.key} · ${item.title}` : item.title;
       if (item.url) { title.href = item.url; title.target = '_blank'; title.rel = 'noopener noreferrer'; title.referrerPolicy = 'no-referrer'; title.setAttribute('aria-label', `${title.textContent} — ouvrir dans l’intranet`); }
       const details = doc.createElement('div'); details.className = 'intranet-item-meta';
       const status = doc.createElement('span'); status.textContent = intranetStatusLabel(item.status); details.append(status);
@@ -153,11 +149,18 @@ export function initializeIntranetWork(options = {}) {
       const today = now(); today.setHours(0, 0, 0, 0); if (item.dueAt && item.dueAt < today) due.dataset.overdue = 'true';
       row.append(body, due); fragment.append(row);
     }
-    if (values.length) get('#intranet-items').replaceChildren(fragment);
-    else empty(selectedKind === 'tasks' ? 'Aucune tâche ouverte ne vous est attribuée.' : 'Aucun ticket ouvert ne vous est attribué.');
-    get('#intranet-task-count').textContent = `(${work.tasks.length}${work.tasksHasMore ? '+' : ''})`;
-    get('#intranet-ticket-count').textContent = `(${work.tickets.length}${work.ticketsHasMore ? '+' : ''})`;
-    get('#intranet-limit').hidden = !(selectedKind === 'tasks' ? work.tasksHasMore : work.ticketsHasMore);
+    if (values.length) get(selector).replaceChildren(fragment);
+    else empty(kind === 'tasks' ? 'Aucune tâche ouverte ne vous est attribuée.' : 'Aucun ticket ouvert ne vous est attribué.', selector);
+  }
+  function renderItems() {
+    if (!work) return;
+    renderList(work.tasks, 'tasks', '#intranet-tasks');
+    renderList(work.tickets, 'tickets', '#intranet-tickets');
+    get('#intranet-task-count').textContent = `${work.tasks.length}${work.tasksHasMore ? '+' : ''}`;
+    get('#intranet-ticket-count').textContent = `${work.tickets.length}${work.ticketsHasMore ? '+' : ''}`;
+    const limitedKinds = [work.tasksHasMore ? 'tâches' : '', work.ticketsHasMore ? 'tickets' : ''].filter(Boolean);
+    get('#intranet-limit').hidden = limitedKinds.length === 0;
+    if (limitedKinds.length) get('#intranet-limit').textContent = `L’aperçu des ${limitedKinds.join(' et ')} est limité. Ouvrez l’intranet pour tout consulter.`;
   }
   async function refresh(accessToken = null) {
     if (!account || !pca || needsReconnect || authBusy || Date.now() < retryUntil) return;
@@ -211,9 +214,6 @@ export function initializeIntranetWork(options = {}) {
   get('#intranet-configure').addEventListener('click', showSetup);
   get('#intranet-refresh').addEventListener('click', () => refresh());
   get('#intranet-disconnect').addEventListener('click', disconnect);
-  doc.querySelectorAll('[data-intranet-kind]').forEach(button => button.addEventListener('click', () => {
-    selectedKind = button.dataset.intranetKind === 'tickets' ? 'tickets' : 'tasks'; renderItems(); controls();
-  }));
   doc.querySelectorAll('[data-intranet-close]').forEach(button => button.addEventListener('click', closeSetup));
   get('#intranet-setup').addEventListener('close', () => { if (dialogTrigger?.isConnected) dialogTrigger.focus(); });
   get('#intranet-config-form').addEventListener('submit', async event => {
