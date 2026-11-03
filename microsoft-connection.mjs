@@ -8,7 +8,7 @@ export function initializeMicrosoftConnection(options = {}) {
   const banner = get('#microsoft-connection'), button = get('#microsoft-connect'), menuButton = get('#microsoft-connect-menu');
   if (!banner || !button) return null;
   const status = get('#microsoft-connection-status');
-  const serviceButtons = ['outlook', 'mail', 'intranet', 'news'].map(name => get(`#${name}-connect`));
+  const serviceButtons = ['outlook', 'mail', 'intranet', 'news', 'directory', 'rooms'].map(name => get(`#${name}-connect`)).filter(Boolean);
   const redirectUri = new URL('auth-redirect.html', doc.baseURI).href;
   const loadSdk = options.loadSdk || (() => import('./vendor/msal.js'));
   let storage = null;

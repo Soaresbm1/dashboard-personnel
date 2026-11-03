@@ -14,6 +14,7 @@
   <script src="intranet.js" type="module"></script>
   <script src="mail.js" type="module"></script>
   <script src="news.js" type="module"></script>
+  <script src="workplace-tools.mjs" type="module"></script>
 </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:none">
@@ -71,6 +72,10 @@
         <a href="https://outlook.office.com/calendar/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Calendrier <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
         <a href="https://teams.microsoft.com/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Teams <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
         <a href="https://intranet.isp-spi.ch/intranet" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Intranet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
+        <span id="workplace-tools" class="workplace-tools">
+          <button id="directory-open" type="button" aria-haspopup="dialog" aria-controls="directory-setup">Annuaire</button>
+          <button id="rooms-open" type="button" aria-haspopup="dialog" aria-controls="rooms-setup">Salles <span id="rooms-summary" class="tool-summary">—</span></button>
+        </span>
       </nav>
       <div class="overview-grid">
         <section id="outlook-agenda" class="panel agenda-panel" aria-labelledby="outlook-title">
@@ -137,6 +142,30 @@
       <footer class="page-footer"><span>Actualisation automatique · 1 min</span><span>Consultation en lecture seule</span></footer>
     </main>
   </div>
+
+  <dialog id="directory-setup" class="modal workplace-dialog" aria-labelledby="directory-title" aria-describedby="directory-description">
+    <header class="modal-header"><div><h2 id="directory-title" tabindex="-1">Annuaire interne</h2><p id="directory-description" class="workplace-description">Retrouvez un collègue et ses coordonnées professionnelles.</p></div><button id="directory-close" type="button" class="icon-button" aria-label="Fermer l’annuaire"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></header>
+    <div class="workplace-body">
+      <label class="sr-only" for="directory-search">Rechercher dans l’annuaire</label>
+      <input id="directory-search" class="directory-search" type="search" placeholder="Nom, service, fonction ou adresse mail" autocomplete="off" maxlength="160">
+      <div class="workplace-status-line"><p id="directory-status" class="service-status" role="status" aria-live="polite">Préparation de l’annuaire…</p><span id="directory-count" class="item-count"></span></div>
+      <div id="directory-items" class="workplace-list" role="region" aria-label="Résultats de l’annuaire" tabindex="0" aria-busy="false"><p class="workplace-empty">Les contacts apparaîtront ici après connexion.</p></div>
+      <div class="workplace-reconnect"><button type="button" class="button" data-workplace-reconnect>Tout reconnecter</button></div>
+      <div hidden><button id="directory-connect" type="button" hidden tabindex="-1" aria-hidden="true"></button></div>
+    </div>
+    <footer class="panel-footer"><a href="https://intranet.isp-spi.ch/intranet/annuaire" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir l’annuaire complet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="directory-last-updated"></span></footer>
+  </dialog>
+
+  <dialog id="rooms-setup" class="modal workplace-dialog" aria-labelledby="rooms-title" aria-describedby="rooms-description">
+    <header class="modal-header"><div><h2 id="rooms-title" tabindex="-1">Disponibilité des salles</h2><p id="rooms-description" class="workplace-description">Disponibilité sur les 30 prochaines minutes · lecture seule.</p></div><button id="rooms-close" type="button" class="icon-button" aria-label="Fermer les salles"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></header>
+    <div class="workplace-body">
+      <p id="rooms-status" class="service-status" role="status" aria-live="polite">Préparation des salles…</p>
+      <div id="rooms-items" class="workplace-list" role="region" aria-label="Salles et disponibilités" tabindex="0" aria-busy="false"><p class="workplace-empty">Les disponibilités apparaîtront ici après connexion.</p></div>
+      <div class="workplace-reconnect"><button type="button" class="button" data-workplace-reconnect>Tout reconnecter</button></div>
+      <div hidden><button id="rooms-connect" type="button" hidden tabindex="-1" aria-hidden="true"></button></div>
+    </div>
+    <footer class="panel-footer"><a href="https://outlook.office.com/calendar/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir le calendrier <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="rooms-last-updated"></span></footer>
+  </dialog>
 
   <dialog id="outlook-setup" class="modal" aria-labelledby="outlook-setup-title" aria-describedby="outlook-setup-description">
     <form id="outlook-config-form">
