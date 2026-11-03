@@ -7,7 +7,38 @@ export const MICROSOFT_DEPLOYMENT = Object.freeze({
 
 const clientsByWindow = new WeakMap();
 const listenersByWindow = new WeakMap();
+const signInStatesByWindow = new WeakMap();
+export const MICROSOFT_GRAPH_SCOPES = Object.freeze(['Calendars.ReadBasic', 'Mail.ReadBasic']);
 export const microsoftSessionKey = config => `mon-espace-microsoft-session-v1:${config.clientId}:${config.tenantId}`;
+
+function sessionState(win, key) {
+  let states = signInStatesByWindow.get(win);
+  if (!states) { states = new Map(); signInStatesByWindow.set(win, states); }
+  if (!states.has(key)) {
+    const state = { epoch: 0, signOuts: 0, externalSignOut: false, references: 0, listeners: new Set(), pending: null, lastStorageEvent: null };
+    state.onStorage = event => storageSignOut(state, key, event);
+    states.set(key, state);
+  }
+  return states.get(key);
+}
+
+function storageSignOut(state, key, event) {
+  if (event.key !== key && event.key !== null || state.lastStorageEvent === event) return;
+  state.lastStorageEvent = event;
+  if (event.key === key && event.newValue === '1') { state.externalSignOut = false; return; }
+  state.epoch++;
+  state.externalSignOut = event.key === key && event.newValue === '0';
+}
+
+function retainSignInObserver(state, win) {
+  if (state.references++ === 0) win.addEventListener?.('storage', state.onStorage);
+}
+
+function releaseSignInObserver(state, win) {
+  if (state.references > 0 && --state.references === 0) win.removeEventListener?.('storage', state.onStorage);
+}
+
+const cancelledSignIn = () => Object.assign(new Error('Microsoft sign-in was cancelled by sign-out.'), { errorCode: 'dashboard_sign_in_cancelled' });
 
 export function isDashboardMicrosoftAccount(account, config) {
   const tenant = account?.tenantId?.toLowerCase();
@@ -51,13 +82,69 @@ export function rememberMicrosoftAccount({ application, account, config, storage
   catch { return false; }
 }
 
+export function subscribeMicrosoftSignIn({ config, window: win }, callback) {
+  const state = sessionState(win, microsoftSessionKey(config)), subscription = { callback };
+  state.listeners.add(subscription);
+  retainSignInObserver(state, win);
+  let subscribed = true;
+  return () => {
+    if (!subscribed) return;
+    subscribed = false; state.listeners.delete(subscription); releaseSignInObserver(state, win);
+  };
+}
+
+// Deliberately not async: MSAL must open its popup during the original click gesture.
+// Graph and intranet tokens are never passed to service listeners; each acquires its own scope silently.
+export function connectMicrosoftServices({ application, config, storage, window: win, redirectUri }) {
+  if (!application?.loginPopup || !config?.clientId || !config?.tenantId || !win) {
+    return Promise.reject(Object.assign(new Error('The Microsoft client must be initialized before connecting.'), { errorCode: 'dashboard_configuration_invalid' }));
+  }
+  const snapshot = { ...config }, key = microsoftSessionKey(snapshot), state = sessionState(win, key);
+  if (state.pending) return state.pending.epoch === state.epoch ? state.pending.promise : Promise.reject(cancelledSignIn());
+  if (state.signOuts || state.externalSignOut) return Promise.reject(cancelledSignIn());
+  const epoch = state.epoch;
+  retainSignInObserver(state, win);
+  let popup;
+  try {
+    popup = application.loginPopup({ scopes: [...MICROSOFT_GRAPH_SCOPES], redirectUri, prompt: 'select_account' });
+  } catch (error) {
+    releaseSignInObserver(state, win);
+    return Promise.reject(error);
+  }
+  const pending = Promise.resolve(popup).then(async response => {
+    if (epoch !== state.epoch || state.signOuts || state.externalSignOut) throw cancelledSignIn();
+    if (!isDashboardMicrosoftAccount(response?.account, snapshot)) {
+      throw Object.assign(new Error('Unexpected Microsoft account'), { errorCode: 'dashboard_account_not_allowed' });
+    }
+    const account = response.account;
+    rememberMicrosoftAccount({ application, account, config: snapshot, storage });
+    const restorations = [];
+    for (const subscription of [...state.listeners]) {
+      if (epoch !== state.epoch || state.signOuts || state.externalSignOut) break;
+      if (!state.listeners.has(subscription)) continue;
+      try { restorations.push(Promise.resolve(subscription.callback(account))); }
+      catch (error) { restorations.push(Promise.reject(error)); }
+    }
+    await Promise.allSettled(restorations);
+    if (epoch !== state.epoch || state.signOuts || state.externalSignOut) throw cancelledSignIn();
+    return account;
+  }).finally(() => {
+    if (state.pending?.promise === pending) state.pending = null;
+    releaseSignInObserver(state, win);
+  });
+  state.pending = { promise: pending, epoch };
+  return pending;
+}
+
 export function subscribeMicrosoftSignOut({ config, window: win }, callback) {
   const key = microsoftSessionKey(config);
+  const state = sessionState(win, key);
   let listeners = listenersByWindow.get(win);
   if (!listeners) { listeners = new Map(); listenersByWindow.set(win, listeners); }
   if (!listeners.has(key)) listeners.set(key, new Set());
   listeners.get(key).add(callback);
   const onStorage = event => {
+    storageSignOut(state, key, event);
     if (event.key === key && event.newValue !== '1') callback(event.newValue === '0');
     else if (event.key === null) callback(false);
   };
@@ -71,9 +158,15 @@ export function subscribeMicrosoftSignOut({ config, window: win }, callback) {
 export async function clearMicrosoftSession({ application, account, config, storage, window: win }) {
   if (!config) return;
   const key = microsoftSessionKey(config);
+  const state = sessionState(win, key);
+  state.epoch++; state.signOuts++;
   try { storage?.setItem(key, '0'); } catch { /* Current-page sign-out still applies. */ }
   // Clear both widgets before waiting for cache cleanup or any in-flight response.
-  const notify = pending => { for (const listener of listenersByWindow.get(win)?.get(key) || []) listener(pending); };
+  const notify = pending => {
+    for (const listener of listenersByWindow.get(win)?.get(key) || []) {
+      try { listener(pending); } catch { /* One widget must not block sign-out for the others. */ }
+    }
+  };
   notify(true);
   try {
     if (!application) return;
@@ -86,6 +179,7 @@ export async function clearMicrosoftSession({ application, account, config, stor
     }
   } finally {
     try { storage?.removeItem(key); } catch { /* A stored '0' also prevents restoration. */ }
-    notify(false);
+    state.signOuts--;
+    notify(state.signOuts > 0 || state.externalSignOut);
   }
 }

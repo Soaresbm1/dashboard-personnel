@@ -3,7 +3,7 @@ import { NEWS_API_URL, normalizeNewsResponse, newsDateLabel } from './news-core.
 import { renderPublicationContent } from './news-content.mjs';
 import { retryAfterMilliseconds } from './outlook-core.mjs';
 import { getMicrosoftClient, getRememberedMicrosoftAccount, isDashboardMicrosoftAccount, rememberMicrosoftAccount,
-  subscribeMicrosoftSignOut, clearMicrosoftSession } from './microsoft-session.mjs';
+  subscribeMicrosoftSignOut, subscribeMicrosoftSignIn, clearMicrosoftSession } from './microsoft-session.mjs';
 import { createAutoRefresh } from './auto-refresh.mjs';
 
 export function initializeInternalNews(options = {}) {
@@ -23,7 +23,7 @@ export function initializeInternalNews(options = {}) {
   let config = readConfig(), application = null, sdk = null, account = null;
   let preparing = false, authBusy = false, signingOut = false, fetching = false, reconnect = false, blocked = false;
   let sdkGeneration = 0, connectionGeneration = 0, requestGeneration = 0, controller = null;
-  let lastGood = null, retryUntil = 0, retryTimer = null, lastAttempt = -Infinity, unsubscribe;
+  let lastGood = null, retryUntil = 0, retryTimer = null, lastAttempt = -Infinity, unsubscribe, unsubscribeSignIn, pendingSharedAccount = null, disposed = false;
   const auto = (options.autoRefreshFactory || createAutoRefresh)({ ...options.autoRefreshOptions, document: doc, window: win,
     refresh: () => refresh(null, { automatic: true }),
     canRefresh: () => !!account && !!application && !preparing && !authBusy && !fetching && !reconnect && !blocked,
@@ -47,23 +47,51 @@ export function initializeInternalNews(options = {}) {
     if (reset) { clearTimeout(retryTimer); retryTimer = null; retryUntil = 0; }
   }
   function signedOut(pending = false) {
-    auto.stop(); sdkGeneration++; connectionGeneration++; account = null;
+    if (disposed) return;
+    auto.stop(); sdkGeneration++; connectionGeneration++; account = null; pendingSharedAccount = null;
     reconnect = false; blocked = false; preparing = false; signingOut = !!pending; authBusy = !!pending; cancel(true);
     clear('Connectez votre compte pour lire la dernière publication.'); status('Microsoft déconnecté de ce dashboard.'); controls();
   }
-  function bindSignOut() { unsubscribe?.(); unsubscribe = subscribeMicrosoftSignOut({ config, window: win }, signedOut); }
+  function bindSignOut() {
+    unsubscribe?.(); unsubscribeSignIn?.();
+    pendingSharedAccount = null;
+    const boundConfig = config;
+    unsubscribe = subscribeMicrosoftSignOut({ config, window: win }, pending => {
+      if (!disposed && config === boundConfig) signedOut(pending);
+    });
+    unsubscribeSignIn = subscribeMicrosoftSignIn({ config, window: win }, identity => {
+      if (!disposed && config === boundConfig) return resumeMicrosoftAccount(identity);
+    });
+  }
+  async function resumeMicrosoftAccount(identity) {
+    if (disposed || signingOut || authBusy || !isDashboardMicrosoftAccount(identity, config) || syncConfig()) return;
+    if (preparing || !application) {
+      pendingSharedAccount = identity;
+      if (!preparing) await prepare();
+      return;
+    }
+    connectionGeneration++; auto.stop(); cancel(true);
+    account = identity; reconnect = false; blocked = false; signingOut = false; authBusy = false;
+    lastAttempt = -Infinity; controls(); auto.start();
+    await refresh();
+  }
   function syncConfig() {
     const next = readConfig();
     if (JSON.stringify(next) === JSON.stringify(config)) return false;
     signedOut(false); application = null; config = next; bindSignOut(); prepare(); return true;
   }
   async function prepare() {
+    if (disposed) return;
     const generation = ++sdkGeneration, snapshot = { ...config };
     preparing = true; status('Préparation des actualités…', 'loading'); controls();
     try {
       const client = await getMicrosoftClient({ config: snapshot, redirectUri, loadSdk, window: win });
-      if (generation !== sdkGeneration) return;
+      if (disposed || generation !== sdkGeneration) return;
       application = client.application; sdk = client.sdk; preparing = false;
+      if (pendingSharedAccount) {
+        const identity = pendingSharedAccount; pendingSharedAccount = null;
+        await resumeMicrosoftAccount(identity); return;
+      }
       account = getRememberedMicrosoftAccount({ application, config: snapshot, storage });
       if (account) { auto.start(); await refresh(); }
       else status('Connectez l’intranet pour retrouver sa dernière publication.');
@@ -71,6 +99,7 @@ export function initializeInternalNews(options = {}) {
     finally { if (generation === sdkGeneration) { preparing = false; controls(); } }
   }
   async function connect() {
+    if (disposed) return;
     if (syncConfig() || preparing || authBusy) return;
     if (!application) { await prepare(); return; }
     const generation = ++connectionGeneration, client = application, snapshot = { ...config };
@@ -114,7 +143,7 @@ export function initializeInternalNews(options = {}) {
     else empty('Aucune publication disponible pour le moment.');
   }
   async function refresh(token = null, { automatic = false } = {}) {
-    if (syncConfig() || !application || !account || reconnect || preparing || authBusy || fetching || nowMs() < retryUntil) return;
+    if (disposed || syncConfig() || !application || !account || reconnect || preparing || authBusy || fetching || nowMs() < retryUntil) return;
     lastAttempt = nowMs(); cancel(); const generation = requestGeneration, client = application, identity = account;
     const retain = automatic && !!lastGood; fetching = true; controller = new AbortController(); const abort = controller;
     if (!retain) { clear('Chargement de la dernière publication…'); status('Lecture de l’intranet…', 'loading'); } controls();
@@ -168,8 +197,9 @@ export function initializeInternalNews(options = {}) {
   get('#news-disconnect').addEventListener('click', disconnect);
   get('#intranet-config-form')?.addEventListener('submit', syncConfig);
   win.addEventListener?.('storage', storageChanged);
+  win.addEventListener?.('dashboard-intranet-config-changed', syncConfig);
   clear('La dernière publication apparaîtra ici après connexion.'); bindSignOut(); controls(); prepare();
-  return { refresh, connect, disconnect, dispose() { auto.dispose(); sdkGeneration++; connectionGeneration++; cancel(true); unsubscribe?.(); win.removeEventListener?.('storage', storageChanged); get('#intranet-config-form')?.removeEventListener?.('submit', syncConfig); } };
+  return { refresh, connect, disconnect, dispose() { disposed = true; pendingSharedAccount = null; auto.dispose(); sdkGeneration++; connectionGeneration++; cancel(true); unsubscribe?.(); unsubscribeSignIn?.(); win.removeEventListener?.('storage', storageChanged); win.removeEventListener?.('dashboard-intranet-config-changed', syncConfig); get('#intranet-config-form')?.removeEventListener?.('submit', syncConfig); } };
 }
 
 if (typeof document !== 'undefined') initializeInternalNews();

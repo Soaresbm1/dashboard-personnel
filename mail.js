@@ -2,7 +2,7 @@ import { MAIL_SCOPES, MAIL_PREVIEW_LIMIT, MAIL_PREVIEW_PAGES, mailListUrl, inbox
   safeMailGraphUrl, normalizeUnreadCount, normalizeMailMessages, mailDateLabel } from './mail-core.mjs';
 import { OUTLOOK_CONFIG_KEY, normalizeOutlookConfig, retryAfterMilliseconds } from './outlook-core.mjs';
 import { MICROSOFT_DEPLOYMENT, getMicrosoftClient, getRememberedMicrosoftAccount, isDashboardMicrosoftAccount,
-  rememberMicrosoftAccount, clearMicrosoftSession, subscribeMicrosoftSignOut } from './microsoft-session.mjs';
+  rememberMicrosoftAccount, clearMicrosoftSession, subscribeMicrosoftSignOut, subscribeMicrosoftSignIn } from './microsoft-session.mjs';
 import { createAutoRefresh } from './auto-refresh.mjs';
 
 // Mail metadata lives only in memory. Authentication and sign-out use the shared Microsoft session.
@@ -23,7 +23,7 @@ export function initializeMailPreview(options = {}) {
   let config = readConfig(), pca = null, sdk = null, account = null;
   let sdkLoading = false, authBusy = false, signingOut = false, needsReconnect = false, accessBlocked = false, fetching = false;
   let selectedFilter = 'unread', sdkGeneration = 0, connectionGeneration = 0, requestGeneration = 0;
-  let controller = null, retryUntil = 0, retryTimer = null, lastRequestStartedAt = -Infinity, lastGood = null, unsubscribeSignOut = null;
+  let controller = null, retryUntil = 0, retryTimer = null, lastRequestStartedAt = -Infinity, lastGood = null, unsubscribeSignOut = null, unsubscribeSignIn = null, disposed = false;
 
   function setStatus(text, state = '') { get('#mail-status').textContent = text; get('#mail-status').dataset.state = state; }
   function empty(text) { const element = doc.createElement('p'); element.className = 'mail-empty'; element.textContent = text; get('#mail-items').replaceChildren(element); }
@@ -57,13 +57,41 @@ export function initializeMailPreview(options = {}) {
     if (resetThrottle) { clearTimeout(retryTimer); retryUntil = 0; }
   }
   function signedOut(pending = false) {
+    if (disposed) return;
+    sdkGeneration++; sdkLoading = false;
     autoRefresh.stop(); connectionGeneration++; account = null; needsReconnect = false; accessBlocked = false;
     signingOut = pending; authBusy = pending; cancelRequests({ resetThrottle: true });
     clearMessages('Connectez Outlook pour afficher vos cinq derniers mails.');
     setStatus('Microsoft déconnecté de ce dashboard.'); renderControls();
   }
-  function observeSignOut() { unsubscribeSignOut?.(); unsubscribeSignOut = subscribeMicrosoftSignOut({ config, window: win }, signedOut); }
+  function observeSignOut() {
+    unsubscribeSignOut?.(); unsubscribeSignIn?.();
+    if (disposed || !config) return;
+    unsubscribeSignOut = subscribeMicrosoftSignOut({ config, window: win }, signedOut);
+    unsubscribeSignIn = subscribeMicrosoftSignIn({ config, window: win }, signedIn);
+  }
+  async function signedIn(incomingAccount) {
+    if (disposed || configChanged() || signingOut || !isDashboardMicrosoftAccount(incomingAccount, config)) return;
+    const generation = ++sdkGeneration, connection = ++connectionGeneration, snapshot = { ...config };
+    autoRefresh.stop(); cancelRequests({ resetThrottle: true });
+    account = null; pca = null; needsReconnect = false; accessBlocked = false; authBusy = false; signingOut = false; sdkLoading = true;
+    clearMessages('Chargement des mails Outlook…'); renderControls();
+    try {
+      const result = await getMicrosoftClient({ config: snapshot, redirectUri, loadSdk, window: win });
+      if (disposed || generation !== sdkGeneration || connection !== connectionGeneration || configChanged()) return;
+      pca = result.application; sdk = result.sdk; account = incomingAccount; sdkLoading = false;
+      pca.setActiveAccount(account); renderControls(); autoRefresh.start();
+      // No access token crosses the shared signal; acquire only this widget's mail scope.
+      await refresh();
+    } catch {
+      if (disposed || generation !== sdkGeneration || connection !== connectionGeneration) return;
+      setStatus('La connexion Microsoft ne peut pas être préparée. Vérifiez votre connexion et réessayez.', 'error');
+    } finally {
+      if (!disposed && generation === sdkGeneration && connection === connectionGeneration) { sdkLoading = false; renderControls(); }
+    }
+  }
   function configChanged() {
+    if (disposed) return false;
     const next = readConfig();
     if (next?.clientId === config?.clientId && next?.tenantId === config?.tenantId) return false;
     autoRefresh.stop(); sdkGeneration++; connectionGeneration++; cancelRequests({ resetThrottle: true });
@@ -73,12 +101,12 @@ export function initializeMailPreview(options = {}) {
     return true;
   }
   async function prepareSdk() {
-    if (!config) return;
+    if (disposed || !config) return;
     const generation = ++sdkGeneration, snapshot = { ...config };
     sdkLoading = true; pca = null; setStatus('Préparation de la connexion aux mails Outlook…', 'loading'); renderControls();
     try {
       const result = await getMicrosoftClient({ config: snapshot, redirectUri, loadSdk, window: win });
-      if (generation !== sdkGeneration) return;
+      if (disposed || generation !== sdkGeneration || configChanged()) return;
       pca = result.application; sdk = result.sdk;
       setStatus('Connectez Outlook pour autoriser la lecture des sujets et des expéditeurs.');
       const restored = getRememberedMicrosoftAccount({ application: pca, config: snapshot, storage });
@@ -95,6 +123,7 @@ export function initializeMailPreview(options = {}) {
     return 'La connexion aux mails Outlook n’a pas abouti. Vérifiez la connexion et l’autorisation Mail.ReadBasic de cette application.';
   }
   async function connect() {
+    if (disposed) return;
     if (configChanged()) return;
     if (!config) { get('#outlook-configure')?.click(); return; }
     if (sdkLoading || authBusy) return;
@@ -137,6 +166,7 @@ export function initializeMailPreview(options = {}) {
   }
 
   async function refresh(accessToken = null, { automatic = false } = {}) {
+    if (disposed) return;
     if (configChanged()) return;
     if (!account || !pca || sdkLoading || authBusy || needsReconnect || nowMs() < retryUntil || automatic && (fetching || accessBlocked)) return;
     lastRequestStartedAt = nowMs(); cancelRequests();
@@ -213,25 +243,31 @@ export function initializeMailPreview(options = {}) {
       }
     } finally { token = null; if (generation === requestGeneration) { fetching = false; controller = null; renderControls(); } }
   }
-  async function disconnect() { await clearMicrosoftSession({ application: pca, account, config, storage, window: win }); }
+  async function disconnect() { if (!disposed) await clearMicrosoftSession({ application: pca, account, config, storage, window: win }); }
   const autoRefresh = (options.autoRefreshFactory || createAutoRefresh)({
     ...options.autoRefreshOptions, document: doc, window: win, nowMs,
     refresh: () => refresh(null, { automatic: true }),
-    canRefresh: () => !!(account && pca && !sdkLoading && !authBusy && !fetching && !needsReconnect && !accessBlocked),
+    canRefresh: () => !!(!disposed && account && pca && !sdkLoading && !authBusy && !fetching && !needsReconnect && !accessBlocked),
     retryAt: () => retryUntil, lastAttemptAt: () => lastRequestStartedAt, intervalMs: 60000
   });
   get('#mail-connect').addEventListener('click', connect);
   get('#mail-refresh').addEventListener('click', () => refresh());
   get('#mail-disconnect').addEventListener('click', disconnect);
   doc.querySelectorAll('[data-mail-filter]').forEach(button => button.addEventListener('click', () => {
-    if (authBusy || needsReconnect || nowMs() < retryUntil) return;
+    if (disposed || authBusy || needsReconnect || nowMs() < retryUntil) return;
     selectedFilter = button.dataset.mailFilter === 'important' ? 'important' : 'unread'; renderControls(); refresh();
   }));
   const onStorage = event => { if (event.key === OUTLOOK_CONFIG_KEY || event.key === null) configChanged(); };
   const onConfigSubmit = () => queueMicrotask(configChanged);
   const onForgetConfig = () => {
+    if (disposed) return;
     autoRefresh.stop(); sdkGeneration++; connectionGeneration++; cancelRequests({ resetThrottle: true });
     account = null; pca = null; sdkLoading = false; needsReconnect = false; accessBlocked = false;
+    // The agenda removes the saved identifiers after its shared sign-out completes.
+    // Listen on the public deployment again so the next central sign-in can resume mail.
+    if (config?.clientId !== MICROSOFT_DEPLOYMENT.clientId || config?.tenantId !== MICROSOFT_DEPLOYMENT.tenantId) {
+      config = normalizeOutlookConfig(MICROSOFT_DEPLOYMENT); authBusy = false; signingOut = false; observeSignOut();
+    }
     clearMessages('La configuration Microsoft a été retirée. Connectez de nouveau les mails Outlook.');
     setStatus('Les mails sont masqués après le retrait de la configuration Microsoft.'); renderControls();
   };
@@ -242,7 +278,8 @@ export function initializeMailPreview(options = {}) {
   setStatus('Une autorisation Mail.ReadBasic permet cet aperçu en lecture seule.'); renderControls();
   if (config) { observeSignOut(); prepareSdk(); }
   return { connect, refresh, disconnect, dispose() {
-    autoRefresh.dispose(); cancelRequests({ resetThrottle: true }); unsubscribeSignOut?.(); win.removeEventListener?.('storage', onStorage);
+    disposed = true; sdkGeneration++; connectionGeneration++;
+    autoRefresh.dispose(); cancelRequests({ resetThrottle: true }); unsubscribeSignOut?.(); unsubscribeSignIn?.(); win.removeEventListener?.('storage', onStorage);
     get('#outlook-config-form')?.removeEventListener?.('submit', onConfigSubmit); get('#outlook-forget-config')?.removeEventListener?.('click', onForgetConfig);
   } };
 }

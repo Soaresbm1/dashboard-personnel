@@ -9,6 +9,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <script src="app.js" type="module"></script>
+  <script src="microsoft-connection.mjs" type="module"></script>
   <script src="outlook.js" type="module"></script>
   <script src="intranet.js" type="module"></script>
   <script src="mail.js" type="module"></script>
@@ -32,6 +33,7 @@
           <summary><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span>Connexions</span></summary>
           <div class="connection-options">
             <p class="menu-label">MICROSOFT 365</p>
+            <button id="microsoft-connect-menu" type="button">Tout reconnecter</button>
             <button id="outlook-configure" type="button">Paramètres Outlook</button>
             <button id="intranet-configure" type="button">Paramètres intranet</button>
             <button id="outlook-disconnect" class="disconnect-button" type="button" title="Déconnecter tous les services Microsoft de ce dashboard" hidden>Déconnecter Microsoft</button>
@@ -45,6 +47,10 @@
 
     <main id="main">
       <h1 id="overview" class="sr-only">Vue d’ensemble</h1>
+      <section id="microsoft-connection" class="microsoft-connection" aria-label="Connexion à tous les services">
+        <p id="microsoft-connection-status" role="status" aria-live="polite">Une seule connexion pour l’agenda, les mails et l’intranet.</p>
+        <button id="microsoft-connect" class="button button-primary" type="button" disabled>Préparation…</button>
+      </section>
       <dl class="summary-grid" aria-label="Résumé">
         <div id="summary-agenda" class="summary-item">
           <dt>Prochain rendez-vous</dt>
@@ -78,7 +84,7 @@
           </div>
           <p id="outlook-status" class="service-status" role="status" aria-live="polite">Préparation de l’agenda…</p>
           <div id="outlook-events" class="outlook-events scroll-list" role="region" aria-label="Rendez-vous" tabindex="0" aria-busy="false"><p class="outlook-empty">Votre agenda apparaîtra ici.</p></div>
-          <div class="connection-panel"><button id="outlook-connect" class="button button-primary" type="button">Connecter Microsoft 365</button></div>
+          <div class="connection-panel" hidden><button id="outlook-connect" class="button button-primary" type="button">Connecter Microsoft 365</button></div>
           <footer class="panel-footer"><a href="https://outlook.office.com/calendar/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir Outlook <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="outlook-last-updated"></span></footer>
         </section>
 
@@ -100,7 +106,7 @@
             </section>
           </div>
           <p id="intranet-limit" class="limit-note" hidden>Cet aperçu est limité. Retrouvez tous vos éléments dans l’intranet.</p>
-          <div class="connection-panel"><button id="intranet-connect" class="button button-primary" type="button">Connecter l’intranet</button></div>
+          <div class="connection-panel" hidden><button id="intranet-connect" class="button button-primary" type="button">Connecter l’intranet</button></div>
           <footer class="panel-footer"><a href="https://intranet.isp-spi.ch/intranet" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir l’intranet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="intranet-last-updated"></span></footer>
         </section>
         <section id="mail-preview" class="panel" aria-labelledby="mail-title">
@@ -114,7 +120,7 @@
           </div>
           <p id="mail-status" class="service-status" role="status" aria-live="polite">Préparation du courrier…</p>
           <div id="mail-items" class="scroll-list" role="region" aria-label="Liste des mails" tabindex="0" aria-busy="false"><p class="mail-empty">Vos mails apparaîtront ici.</p></div>
-          <div class="connection-panel"><button id="mail-connect" class="button button-primary" type="button">Connecter les mails Outlook</button></div>
+          <div class="connection-panel" hidden><button id="mail-connect" class="button button-primary" type="button">Connecter les mails Outlook</button></div>
           <footer class="panel-footer"><a href="https://outlook.office.com/mail/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir Outlook <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="mail-last-updated"></span></footer>
         </section>
         <section id="news-preview" class="panel" aria-labelledby="news-title">
@@ -124,7 +130,7 @@
           </header>
           <p id="news-status" class="service-status" role="status" aria-live="polite">Préparation des actualités…</p>
           <div id="news-items" class="scroll-list" role="region" aria-label="Dernière publication" tabindex="0" aria-busy="false"><p class="news-empty">La dernière publication apparaîtra ici.</p></div>
-          <div class="connection-panel"><button id="news-connect" class="button button-primary" type="button">Connecter les actualités</button></div>
+          <div class="connection-panel" hidden><button id="news-connect" class="button button-primary" type="button">Connecter les actualités</button></div>
           <footer class="panel-footer"><a href="https://intranet.isp-spi.ch/intranet" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir l’intranet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="news-last-updated"></span></footer>
         </section>
       </div>
@@ -141,7 +147,7 @@
         <div class="field"><label for="outlook-tenant-id">ID du locataire</label><input id="outlook-tenant-id" type="text" required maxlength="36" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
         <details class="advanced-settings"><summary>Adresse de retour Microsoft</summary><div class="field"><label for="outlook-redirect-uri">Adresse de redirection</label><input id="outlook-redirect-uri" type="text" readonly spellcheck="false"><button id="outlook-copy-redirect" type="button" class="text-button">Copier l’adresse</button></div></details>
         <p id="outlook-config-error" class="error-text" role="alert" hidden></p>
-        <button id="outlook-forget-config" type="button" class="text-button" hidden>Effacer ces réglages</button>
+        <button id="outlook-forget-config" type="button" class="text-button" hidden>Rétablir les réglages du dashboard</button>
       </div>
       <footer class="modal-footer"><button type="button" class="button" data-outlook-close>Annuler</button><button type="submit" class="button button-primary">Enregistrer</button></footer>
     </form>
@@ -156,7 +162,7 @@
         <p id="intranet-shared-help" class="field-help">Les identifiants du dashboard sont préremplis.</p>
         <div class="field"><label for="intranet-api-client-id">ID de l’API intranet</label><input id="intranet-api-client-id" type="text" required maxlength="36" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
         <p id="intranet-config-error" class="error-text" role="alert" hidden></p>
-        <button id="intranet-forget-config" type="button" class="text-button" hidden>Effacer ces réglages</button>
+        <button id="intranet-forget-config" type="button" class="text-button" hidden>Rétablir les réglages du dashboard</button>
       </div>
       <footer class="modal-footer"><button type="button" class="button" data-intranet-close>Annuler</button><button type="submit" class="button button-primary">Enregistrer</button></footer>
     </form>
