@@ -1,9 +1,10 @@
 import { OUTLOOK_CONFIG_KEY, normalizeOutlookConfig, retryAfterMilliseconds } from './outlook-core.mjs';
 import { INTRANET_CONFIG_KEY, INTRANET_API_URL, INTRANET_DEPLOYMENT_IDS, normalizeIntranetConfig, intranetScope, normalizeIntranetWork,
-  intranetStatusLabel, intranetPriority, intranetDueLabel } from './intranet-core.mjs';
+  intranetStatusLabel, intranetPriority, intranetDueLabel, sortIntranetByUrgency } from './intranet-core.mjs';
 import { getMicrosoftClient, isDashboardMicrosoftAccount, getRememberedMicrosoftAccount, rememberMicrosoftAccount,
   clearMicrosoftSession, subscribeMicrosoftSignOut } from './microsoft-session.mjs';
 import { createAutoRefresh } from './auto-refresh.mjs';
+import { setWorkSummary } from './dashboard-summary.mjs';
 
 // Work items stay in memory. Microsoft manages the persistent sign-in cache separately.
 export function initializeIntranetWork(options = {}) {
@@ -43,11 +44,12 @@ export function initializeIntranetWork(options = {}) {
     const element = doc.createElement('p'); element.className = 'intranet-empty'; element.textContent = message;
     get(selector).replaceChildren(element);
   }
-  function clearWork(message) {
+  function clearWork(message, status = 'unavailable') {
     work = null; lastGood = null; get('#intranet-last-updated').textContent = '';
     empty(message, '#intranet-tasks'); empty(message, '#intranet-tickets');
     get('#intranet-task-count').textContent = ''; get('#intranet-ticket-count').textContent = '';
     get('#intranet-limit').hidden = true;
+    setWorkSummary({ status, work: null }, doc, now());
   }
   function updatedAtLabel(date) {
     return new Intl.DateTimeFormat('fr-CH', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(date);
@@ -139,7 +141,7 @@ export function initializeIntranetWork(options = {}) {
     if (!pca) { await prepareSdk(); return; }
     const generation = ++connectionGeneration, application = pca, snapshot = { ...config };
     autoRefresh.stop();
-    authBusy = true; cancelRequests(); clearWork('Connexion sécurisée à Microsoft…');
+    authBusy = true; cancelRequests(); clearWork('Connexion sécurisée à Microsoft…', 'loading');
     setStatus('Terminez la connexion dans la fenêtre Microsoft.', 'loading'); controls();
     try {
       // Start from the user's click, without awaiting another operation before the popup.
@@ -200,7 +202,7 @@ export function initializeIntranetWork(options = {}) {
     const abortController = new AbortController(); controller = abortController;
     const retainingWork = automatic && !!work;
     fetching = true;
-    if (!retainingWork) { clearWork('Chargement de vos tâches et de vos tickets…'); setStatus('Lecture de l’intranet…', 'loading'); }
+    if (!retainingWork) { clearWork('Chargement de vos tâches et de vos tickets…', 'loading'); setStatus('Lecture de l’intranet…', 'loading'); }
     controls();
     let timeout;
     try {
@@ -217,11 +219,14 @@ export function initializeIntranetWork(options = {}) {
       try { nextWork = normalizeIntranetWork(await response.json()); }
       catch { throw Object.assign(new Error('Invalid intranet response'), { unsafeResponse: true }); }
       if (generation !== requestGeneration) return;
-      const currentTime = now(), signature = workSignature(nextWork, currentTime);
+      const currentTime = now();
+      nextWork = { ...nextWork, tasks: sortIntranetByUrgency(nextWork.tasks, currentTime), tickets: sortIntranetByUrgency(nextWork.tickets, currentTime) };
+      const signature = workSignature(nextWork, currentTime);
       const unchanged = retainingWork && lastGood?.signature === signature;
       work = nextWork;
       if (!unchanged) renderItems(currentTime);
       lastGood = { at: currentTime, signature };
+      setWorkSummary({ status: 'ready', work }, doc, currentTime);
       get('#intranet-last-updated').textContent = `Actualisé le ${updatedAtLabel(currentTime)}`;
       setStatus('Vos éléments attribués · lecture seule', 'connected');
       autoRefresh.start();
@@ -232,6 +237,7 @@ export function initializeIntranetWork(options = {}) {
         || !error.httpStatus && (error instanceof TypeError || ['network_error', 'no_network_connectivity', 'post_request_failed', 'get_request_failed', 'timed_out'].includes(error.errorCode)));
       const keepPrevious = retainingWork && transientError && !interactionRequired;
       if (!keepPrevious) clearWork('Vos tâches et vos tickets sont indisponibles pour le moment.');
+      else setWorkSummary({ status: 'stale', work }, doc, now());
       if (interactionRequired || ['interaction_required', 'login_required', 'consent_required'].includes(error?.errorCode) || error.httpStatus === 401) {
         autoRefresh.stop();
         needsReconnect = true; setStatus('Votre session doit être renouvelée. Reconnectez l’intranet pour afficher vos éléments.', 'error');

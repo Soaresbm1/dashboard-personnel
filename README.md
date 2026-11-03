@@ -4,6 +4,12 @@ Un dashboard personnel statique, en français et adapté aux ordinateurs et tél
 
 Une page unique de consultation regroupe l’agenda Outlook et les tâches et tickets attribués dans l’intranet. Les deux listes de travail sont visibles simultanément, avec leurs statuts, priorités, échéances et liens d’origine. L’interface utilise des tons neutres et ne propose aucune création de contenu, projet, note, habitude ou minuteur. Les seuls réglages concernent les connexions Microsoft.
 
+## Résumé et ordre de priorité
+
+Une ligne discrète présente le prochain rendez-vous de la période sélectionnée, le nombre de tâches en retard et le nombre de tickets prioritaires (bloquants ou priorité élevée). Un rendez-vous en cours est signalé, les événements terminés sont écartés et les titres privés restent masqués. Les compteurs concernent les éléments ouverts reçus ; une limite de l’API est indiquée dans le résumé. « — » signifie que les données ne sont pas disponibles, tandis que « 0 » correspond à une lecture réussie sans élément concerné.
+
+Les tâches et les tickets sont classés séparément : bloquants ou en retard, échéances du jour, priorités élevées, puis autres éléments. Dans chaque groupe, la priorité puis l’échéance la plus proche départagent les éléments, avec un ordre stable en cas d’égalité. Les éléments clôturés éventuellement reçus sont placés à la fin et exclus des compteurs d’urgence. Le résumé suit les actualisations, signale les données anciennes et s’efface avec les listes lors d’une déconnexion ou d’un refus d’accès.
+
 ## Actualisation automatique
 
 L’agenda et les deux listes de travail se mettent à jour chaque minute lorsque la page est visible et le navigateur en ligne. Le retour sur l’onglet ou le rétablissement du réseau déclenche une mise à jour, avec au moins cinq secondes entre deux tentatives rapprochées. Les demandes en cours ne sont pas doublées et les délais `Retry-After` sont respectés.

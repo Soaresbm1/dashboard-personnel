@@ -44,6 +44,20 @@
         <div><p class="eyebrow">VOTRE ESPACE PERSONNEL</p><h1>Vue d’ensemble</h1><p class="page-description">Votre agenda et ce qui vous est attribué.</p></div>
         <time id="top-date" class="date-label"></time>
       </div>
+      <dl class="summary-grid" aria-label="Résumé">
+        <div id="summary-agenda" class="summary-item">
+          <dt>Prochain rendez-vous</dt>
+          <dd><span id="summary-agenda-value" class="summary-value">—</span><span id="summary-agenda-detail" class="summary-detail">Chargement de l’agenda…</span></dd>
+        </div>
+        <div id="summary-tasks" class="summary-item">
+          <dt>Tâches en retard</dt>
+          <dd><span id="summary-tasks-value" class="summary-value">—</span><span id="summary-tasks-detail" class="summary-detail">Chargement de l’intranet…</span></dd>
+        </div>
+        <div id="summary-tickets" class="summary-item">
+          <dt>Tickets prioritaires</dt>
+          <dd><span id="summary-tickets-value" class="summary-value">—</span><span id="summary-tickets-detail" class="summary-detail">Chargement de l’intranet…</span></dd>
+        </div>
+      </dl>
       <div class="overview-grid">
         <section id="outlook-agenda" class="panel agenda-panel" aria-labelledby="outlook-title">
           <header class="panel-header">
@@ -66,6 +80,7 @@
             <button id="intranet-refresh" type="button" class="icon-button" aria-label="Actualiser les tâches et tickets intranet" title="Actualiser les tâches et tickets" hidden><svg class="icon" aria-hidden="true"><use href="#i-reset"/></svg></button>
           </header>
           <p id="intranet-status" class="service-status" role="status" aria-live="polite">Préparation de l’intranet…</p>
+          <p class="sort-note">Par urgence · bloquants et retards, échéances du jour, puis priorités.</p>
           <div id="intranet-items" class="work-lists" aria-busy="false">
             <section class="work-section" aria-labelledby="intranet-tasks-heading">
               <div class="work-section-heading"><h3 id="intranet-tasks-heading">Tâches</h3><span id="intranet-task-count" class="item-count"></span></div>

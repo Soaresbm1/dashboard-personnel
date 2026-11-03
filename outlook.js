@@ -6,6 +6,7 @@ import {
 import { MICROSOFT_DEPLOYMENT, getMicrosoftClient, getRememberedMicrosoftAccount, isDashboardMicrosoftAccount,
   rememberMicrosoftAccount, clearMicrosoftSession, subscribeMicrosoftSignOut } from './microsoft-session.mjs';
 import { createAutoRefresh } from './auto-refresh.mjs';
+import { setAgendaSummary } from './dashboard-summary.mjs';
 
 // Calendar events stay in memory; MSAL manages the remembered Microsoft connection.
 export function initializeOutlookAgenda(options = {}) {
@@ -16,6 +17,7 @@ export function initializeOutlookAgenda(options = {}) {
   const fetcher = options.fetch || globalThis.fetch.bind(globalThis);
   const loadSdk = options.loadSdk || (() => import('./vendor/msal.js'));
   const now = options.now || (() => new Date());
+  const updateAgendaSummary = options.setAgendaSummary || setAgendaSummary;
   const nowMs = options.autoRefreshOptions?.nowMs || Date.now;
   const redirectUri = new URL('auth-redirect.html', doc.baseURI).href;
   let storage = null, config = null, storageProblem = false;
@@ -42,10 +44,11 @@ export function initializeOutlookAgenda(options = {}) {
     element.className = 'outlook-empty'; element.textContent = text;
     get('#outlook-events').replaceChildren(element);
   }
-  function clearEvents(text) {
+  function clearEvents(text, summaryStatus = 'unavailable') {
     lastGood = null;
     get('#outlook-last-updated').textContent = '';
     message(text);
+    updateAgendaSummary({ status: summaryStatus, events: [], window: null }, doc, now());
   }
   function updatedAtLabel(date) {
     return new Intl.DateTimeFormat('fr-CH', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(date);
@@ -149,7 +152,7 @@ export function initializeOutlookAgenda(options = {}) {
     const generation = ++connectionGeneration, application = pca;
     autoRefresh.stop();
     authBusy = true; cancelRequests({ resetThrottle: true });
-    clearEvents('Connexion sécurisée à Microsoft 365…');
+    clearEvents('Connexion sécurisée à Microsoft 365…', 'loading');
     setStatus('Terminez la connexion dans la fenêtre Microsoft.', 'loading'); renderControls();
     try {
       // No await before loginPopup: preserve the explicit user gesture for popup blockers.
@@ -212,7 +215,7 @@ export function initializeOutlookAgenda(options = {}) {
     const preserveSnapshot = automatic && lastGood?.account === signedInAccount && lastGood.range === selectedRange;
     const abortController = new AbortController(); controller = abortController;
     fetching = true;
-    if (!preserveSnapshot) { clearEvents('Chargement de vos rendez-vous…'); setStatus('Lecture du calendrier Outlook…', 'loading'); }
+    if (!preserveSnapshot) { clearEvents('Chargement de vos rendez-vous…', 'loading'); setStatus('Lecture du calendrier Outlook…', 'loading'); }
     renderControls();
     let timeout;
     try {
@@ -249,8 +252,9 @@ export function initializeOutlookAgenda(options = {}) {
       if (generation !== requestGeneration) return;
       const currentTime = now(), signature = JSON.stringify({ start: window.start, end: window.end, localDay: [currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate()], events: events.map(event => [event.id, event.title, event.start, event.end, event.location, event.url, event.isAllDay, event.isPrivate, event.start <= currentTime && event.end > currentTime]) });
       if (!preserveSnapshot || lastGood.signature !== signature) renderEvents(events, window);
-      lastGood = { account: signedInAccount, range: selectedRange, at: currentTime, signature };
+      lastGood = { account: signedInAccount, range: selectedRange, at: currentTime, signature, events, window, limited };
       accessBlocked = false;
+      updateAgendaSummary({ status: 'ready', events, window, limited }, doc, now());
       get('#outlook-last-updated').textContent = `Actualisé le ${updatedAtLabel(currentTime)}`;
       setStatus(limited ? 'Le nombre de résultats dépasse cet aperçu. Choisissez une période plus courte ou consultez Outlook.' : `${events.length} rendez-vous · lecture seule · actualisation automatique`, 'connected');
       autoRefresh.start();
@@ -268,6 +272,7 @@ export function initializeOutlookAgenda(options = {}) {
         setStatus('Votre organisation n’autorise pas encore la lecture du calendrier. Demandez à votre administrateur l’accès délégué Calendars.ReadBasic pour cette application.', 'error');
       } else {
         if (!preserveSnapshot) clearEvents('Les rendez-vous ne sont pas disponibles pour le moment.');
+        else updateAgendaSummary({ status: 'stale', events: lastGood.events, window: lastGood.window, limited: lastGood.limited }, doc, now());
         if (error.httpStatus === 429) {
           retryUntil = nowMs() + error.retryAfter;
           setStatus(staleWarning(`Microsoft limite temporairement les demandes. Nouvelle tentative dans au moins ${Math.ceil(error.retryAfter / 1000)} secondes.`), 'error');

@@ -1,4 +1,5 @@
 import { createAutoRefresh } from './auto-refresh.mjs';
+import { renderDashboardSummary } from './dashboard-summary.mjs';
 
 // The read-only overview does not read or modify existing personal browser data.
 function updateDashboardDate() {
@@ -8,6 +9,7 @@ function updateDashboardDate() {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
   }).format(date);
   element.dateTime = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  renderDashboardSummary(document, date);
 }
 function showOverview() {
   if (location.hash && !['#overview', '#main'].includes(location.hash)) history.replaceState(null, '', `${location.pathname}${location.search}#overview`);

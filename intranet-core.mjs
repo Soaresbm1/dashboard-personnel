@@ -74,3 +74,45 @@ export function intranetDueLabel(date, now = new Date()) {
   const formatted = new Intl.DateTimeFormat('fr-CH', { day: 'numeric', month: 'short', ...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) }).format(date);
   return day < today ? `En retard · ${formatted}` : `Pour le ${formatted}`;
 }
+
+const CLOSED_STATUSES = new Set(['done', 'completed', 'complete', 'closed', 'cancelled', 'canceled', 'resolved', 'refused']);
+const frenchOrder = new Intl.Collator('fr', { numeric: true });
+const closed = item => CLOSED_STATUSES.has(typeof item?.status === 'string' ? item.status.toLowerCase() : '');
+const priorityRank = item => {
+  const priority = typeof item?.priority === 'string' ? item.priority.toLowerCase() : '';
+  if (['critical', 'blocked', 'urgent'].includes(priority)) return 0;
+  if (['high', 'degraded'].includes(priority)) return 1;
+  if (['normal', 'medium'].includes(priority)) return 2;
+  return priority === 'low' ? 3 : 4;
+};
+const localDay = date => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+const dueTime = item => item?.dueAt instanceof Date && Number.isFinite(item.dueAt.getTime()) ? item.dueAt.getTime() : Infinity;
+const pastDay = (item, today) => Number.isFinite(dueTime(item)) && localDay(item.dueAt) < today;
+
+// Sort a copy of the normalized API items; never rearrange the caller's snapshot.
+export function sortIntranetByUrgency(items, now = new Date()) {
+  const today = localDay(now);
+  const group = item => priorityRank(item) === 0 || pastDay(item, today) ? 0
+    : Number.isFinite(dueTime(item)) && localDay(item.dueAt) === today ? 1
+      : priorityRank(item) === 1 ? 2 : 3;
+  return (Array.isArray(items) ? [...items] : []).sort((a, b) => {
+    const order = Number(closed(a)) - Number(closed(b)) || group(a) - group(b)
+      || priorityRank(a) - priorityRank(b) || dueTime(a) - dueTime(b)
+      || frenchOrder.compare(String(a?.title || ''), String(b?.title || ''));
+    if (order) return order;
+    const aId = String(a?.id ?? ''), bId = String(b?.id ?? '');
+    return frenchOrder.compare(aId, bId) || (aId < bId ? -1 : aId > bId ? 1 : 0);
+  });
+}
+
+export function summarizeIntranetWork(work, now = new Date()) {
+  const tasks = (Array.isArray(work?.tasks) ? work.tasks : []).filter(item => item && !closed(item));
+  const tickets = (Array.isArray(work?.tickets) ? work.tickets : []).filter(item => item && !closed(item));
+  const today = localDay(now);
+  return {
+    overdueTasks: tasks.filter(item => pastDay(item, today)).length,
+    priorityTickets: tickets.filter(item => priorityRank(item) <= 1).length,
+    taskCount: tasks.length, ticketCount: tickets.length,
+    tasksHasMore: work?.tasksHasMore === true, ticketsHasMore: work?.ticketsHasMore === true
+  };
+}
