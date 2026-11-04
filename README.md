@@ -100,6 +100,14 @@ Le chargement se fait à l’ouverture, puis toutes les 15 minutes lorsque la pa
 
 Documentation : [API et codes météo](https://open-meteo.com/en/docs), [conditions d’utilisation personnelle et attribution](https://open-meteo.com/en/terms).
 
+## Transports publics — Neuchâtel, Vauseyon
+
+Le bouton **Transports** affiche la ligne et le délai avant le prochain départ. Il ouvre les six prochains bus depuis l’arrêt exact **Neuchâtel, Vauseyon**, identifiant `8504260`, avec destination, heure prévue et prévision/retard lorsqu’ils sont fournis. Les heures sont affichées dans le fuseau `Europe/Zurich`. Un simple horaire n’est pas présenté comme une prévision et aucune information d’annulation non fournie n’est déduite.
+
+L’API publique [Opendata.ch](https://transport.opendata.ch/docs.html) est interrogée sans clé, géolocalisation ni identifiant Microsoft, chaque minute lorsque la page est visible et en ligne. La requête ne charge que l’arrêt et les champs utiles aux départs. Les données restent en mémoire. Le compte à rebours évolue localement et les départs dépassés disparaissent. En panne, les anciens horaires sont signalés et aucun compte à rebours actuel n’est affirmé ; les données sont retirées après trois minutes. Les requêtes sont bornées à 12 secondes, et une réponse de surcharge suspend les nouvelles tentatives.
+
+La source [opentransportdata.swiss](https://opentransportdata.swiss/) et l’API sont citées dans la fenêtre des départs. L’intégration ne change aucune permission Microsoft ou route de l’intranet.
+
 ## Publication avec GitHub Pages
 
 Les fichiers du site sont à la racine du dépôt. Dans **Settings → Pages**, choisissez **Deploy from a branch**, puis la branche **main** et le dossier **/ (root)**. Aucun build ni dépendance n’est nécessaire.
