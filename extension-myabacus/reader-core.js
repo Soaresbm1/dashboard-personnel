@@ -90,5 +90,37 @@
       employeeSelector: all('[role="combobox"],vaadin-combo-box,vaadin-select').some(e => !within(e, picker)),
       balanceRows: rows('Solde'), vacationRows: rows('Solde vacances en jours') };
   }
-  globalThis.MyAbacusLocalReader = Object.freeze({ clean, today, decimal, parse, collect, within });
+  function personalNavigation(doc) {
+    const roots = [doc], seen = new Set(roots);
+    for (let i = 0; i < roots.length && roots.length <= 500; i++) {
+      for (const e of roots[i].querySelectorAll('*')) {
+        if (e.shadowRoot && !seen.has(e.shadowRoot)) { seen.add(e.shadowRoot); roots.push(e.shadowRoot); }
+      }
+    }
+    if (roots.length > 500) return { state: 'waiting' };
+    const shown = e => {
+      if (![...e.getClientRects()].some(r => r.width > 0 && r.height > 0)) return false;
+      for (let p = e; p; p = p.parentElement || p.getRootNode?.().host) {
+        const style = doc.defaultView.getComputedStyle(p);
+        if (p.hidden || p.hasAttribute?.('inert') || p.getAttribute?.('aria-hidden') === 'true'
+          || style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+      }
+      return true;
+    };
+    const all = selector => roots.flatMap(r => [...r.querySelectorAll(selector)]).filter(shown);
+    const avatars = all('vaadin-avatar[role="img"][aria-label]');
+    if (avatars.length !== 1) return { state: 'waiting' };
+    if (clean(avatars[0].getAttribute('aria-label')) !== owner) return { state: 'unavailable', reason: 'account' };
+    const links = all('a[href]').filter(a => {
+      try {
+        const url = new URL(a.getAttribute('href'), doc.location.href);
+        return url.origin === 'https://abaprod.isp-spi.ch' && !url.username && !url.password
+          && url.pathname.replace(/\/$/, '') === '/portal/myabacus/proj_inandout'
+          && url.href.length <= 2048 && clean(a.textContent).includes('In & Out');
+      } catch { return false; }
+    });
+    if (links.length !== 1) return { state: 'waiting' };
+    return { state: 'ready', url: new URL(links[0].getAttribute('href'), doc.location.href).href };
+  }
+  globalThis.MyAbacusLocalReader = Object.freeze({ clean, today, decimal, parse, collect, within, personalNavigation });
 })();
