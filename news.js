@@ -5,6 +5,7 @@ import { retryAfterMilliseconds } from './outlook-core.mjs';
 import { getMicrosoftClient, getRememberedMicrosoftAccount, isDashboardMicrosoftAccount, rememberMicrosoftAccount,
   subscribeMicrosoftSignOut, subscribeMicrosoftSignIn, clearMicrosoftSession } from './microsoft-session.mjs';
 import { createAutoRefresh } from './auto-refresh.mjs';
+import { notificationIdentity, publishNewsNotifications, clearNotificationSource, markNotificationSourceStale } from './notifications-core.mjs';
 
 export function initializeInternalNews(options = {}) {
   const doc = options.document || globalThis.document, win = options.window || globalThis.window;
@@ -48,6 +49,7 @@ export function initializeInternalNews(options = {}) {
   }
   function signedOut(pending = false) {
     if (disposed) return;
+    clearNotificationSource(doc, 'news');
     auto.stop(); sdkGeneration++; connectionGeneration++; account = null; pendingSharedAccount = null;
     reconnect = false; blocked = false; preparing = false; signingOut = !!pending; authBusy = !!pending; cancel(true);
     clear('Connectez votre compte pour lire la dernière publication.'); status('Microsoft déconnecté de ce dashboard.'); controls();
@@ -119,6 +121,7 @@ export function initializeInternalNews(options = {}) {
     } catch (error) {
       if (generation !== connectionGeneration) return;
       account = null; clear('Les actualités ne sont pas connectées.');
+      clearNotificationSource(doc, 'news');
       status(['user_cancelled', 'user_canceled'].includes(error.errorCode) ? 'Connexion annulée.'
         : error.errorCode === 'interaction_in_progress' ? 'Une fenêtre Microsoft est déjà ouverte. Terminez cette connexion puis réessayez.'
           : error.errorCode === 'dashboard_account_not_allowed' ? 'Choisissez le seul compte affecté à ce dashboard.'
@@ -151,7 +154,7 @@ export function initializeInternalNews(options = {}) {
     try {
       const accessToken = token || (await client.acquireTokenSilent({ account: identity, scopes: [intranetScope(config)], redirectUri })).accessToken;
       if (generation !== requestGeneration) return;
-      if (!accessToken) throw new Error('Missing token');
+      if (!accessToken) throw Object.assign(new Error('Missing token'), { notificationAccessUnavailable: true });
       timeout = setTimeout(() => abort.abort(), 20000);
       const response = await fetcher(NEWS_API_URL, { method: 'GET', headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
         signal: abort.signal, redirect: 'error', cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer' });
@@ -165,6 +168,7 @@ export function initializeInternalNews(options = {}) {
       const signature = JSON.stringify(data), at = now();
       if (!retain || lastGood.signature !== signature) render(data);
       lastGood = { data, signature, at }; blocked = false;
+      publishNewsNotifications(doc, { identity: notificationIdentity(identity, config), news: data.news, at });
       get('#news-last-updated').textContent = `Actualisé le ${stamp(at)}`;
       status('Dernière publication visible · lecture seule', 'connected'); auto.start();
     } catch (error) {
@@ -172,6 +176,8 @@ export function initializeInternalNews(options = {}) {
       const expired = sdk?.InteractionRequiredAuthError && error instanceof sdk.InteractionRequiredAuthError
         || ['interaction_required', 'login_required', 'consent_required'].includes(error.errorCode) || error.httpStatus === 401;
       const forbidden = error.httpStatus === 403;
+      if (expired || forbidden || error.unsafeResponse || error.notificationAccessUnavailable) clearNotificationSource(doc, 'news');
+      else markNotificationSourceStale(doc, 'news');
       const transient = !error.unsafeResponse && (error.httpStatus === 429 || error.name === 'AbortError'
         || !error.httpStatus && (error instanceof TypeError || ['network_error', 'no_network_connectivity', 'post_request_failed', 'get_request_failed', 'timed_out'].includes(error.errorCode)));
       const keep = retain && transient && !expired && !forbidden;
@@ -199,7 +205,7 @@ export function initializeInternalNews(options = {}) {
   win.addEventListener?.('storage', storageChanged);
   win.addEventListener?.('dashboard-intranet-config-changed', syncConfig);
   clear('La dernière publication apparaîtra ici après connexion.'); bindSignOut(); controls(); prepare();
-  return { refresh, connect, disconnect, dispose() { disposed = true; pendingSharedAccount = null; auto.dispose(); sdkGeneration++; connectionGeneration++; cancel(true); unsubscribe?.(); unsubscribeSignIn?.(); win.removeEventListener?.('storage', storageChanged); win.removeEventListener?.('dashboard-intranet-config-changed', syncConfig); get('#intranet-config-form')?.removeEventListener?.('submit', syncConfig); } };
+  return { refresh, connect, disconnect, dispose() { clearNotificationSource(doc, 'news'); disposed = true; pendingSharedAccount = null; auto.dispose(); sdkGeneration++; connectionGeneration++; cancel(true); unsubscribe?.(); unsubscribeSignIn?.(); win.removeEventListener?.('storage', storageChanged); win.removeEventListener?.('dashboard-intranet-config-changed', syncConfig); get('#intranet-config-form')?.removeEventListener?.('submit', syncConfig); } };
 }
 
 if (typeof document !== 'undefined') initializeInternalNews();

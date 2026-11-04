@@ -5,6 +5,7 @@ import { getMicrosoftClient, isDashboardMicrosoftAccount, getRememberedMicrosoft
   clearMicrosoftSession, subscribeMicrosoftSignOut, subscribeMicrosoftSignIn } from './microsoft-session.mjs';
 import { createAutoRefresh } from './auto-refresh.mjs';
 import { setWorkSummary } from './dashboard-summary.mjs';
+import { notificationIdentity, publishWorkNotifications, clearNotificationSource, markNotificationSourceStale } from './notifications-core.mjs';
 
 // Work items stay in memory. Microsoft manages the persistent sign-in cache separately.
 export function initializeIntranetWork(options = {}) {
@@ -99,6 +100,7 @@ export function initializeIntranetWork(options = {}) {
   function closeSetup() { get('#intranet-setup').close(); }
   function clearSignedOutView(pending = false) {
     if (disposed) return;
+    clearNotificationSource(doc, 'work');
     autoRefresh.stop();
     sdkGeneration++; sdkLoading = false; pendingSharedAccount = null;
     connectionGeneration++; account = null; needsReconnect = false; signingOut = Boolean(pending); authBusy = signingOut; cancelRequests();
@@ -186,6 +188,7 @@ export function initializeIntranetWork(options = {}) {
     } catch (error) {
       if (generation !== connectionGeneration) return;
       account = null; needsReconnect = false;
+      clearNotificationSource(doc, 'work');
       clearWork('Vos tâches et vos tickets ne sont pas connectés.'); setStatus(connectionError(error), 'error');
     } finally { if (generation === connectionGeneration) { authBusy = false; controls(); } }
   }
@@ -234,7 +237,7 @@ export function initializeIntranetWork(options = {}) {
     try {
       const token = accessToken || (await application.acquireTokenSilent({ account: signedInAccount, scopes: [intranetScope(config)], redirectUri })).accessToken;
       if (generation !== requestGeneration) return;
-      if (!token) throw new Error('Missing intranet access token');
+      if (!token) throw Object.assign(new Error('Missing intranet access token'), { notificationAccessUnavailable: true });
       timeout = setTimeout(() => abortController.abort(), 20000);
       const response = await fetcher(INTRANET_API_URL, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         signal: abortController.signal, cache: 'no-store', credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer' });
@@ -252,6 +255,7 @@ export function initializeIntranetWork(options = {}) {
       work = nextWork;
       if (!unchanged) renderItems(currentTime);
       lastGood = { at: currentTime, signature };
+      publishWorkNotifications(doc, { identity: notificationIdentity(signedInAccount, config), work, at: currentTime });
       setWorkSummary({ status: 'ready', work }, doc, currentTime);
       get('#intranet-last-updated').textContent = `Actualisé le ${updatedAtLabel(currentTime)}`;
       setStatus('Vos éléments attribués · lecture seule', 'connected');
@@ -259,6 +263,9 @@ export function initializeIntranetWork(options = {}) {
     } catch (error) {
       if (generation !== requestGeneration) return;
       const interactionRequired = sdk?.InteractionRequiredAuthError && error instanceof sdk.InteractionRequiredAuthError;
+      if (interactionRequired || ['interaction_required', 'login_required', 'consent_required'].includes(error?.errorCode)
+          || [401, 403].includes(error.httpStatus) || error.unsafeResponse || error.notificationAccessUnavailable) clearNotificationSource(doc, 'work');
+      else markNotificationSourceStale(doc, 'work');
       const transientError = !error.unsafeResponse && (error.httpStatus === 429 || error.name === 'AbortError'
         || !error.httpStatus && (error instanceof TypeError || ['network_error', 'no_network_connectivity', 'post_request_failed', 'get_request_failed', 'timed_out'].includes(error.errorCode)));
       const keepPrevious = retainingWork && transientError && !interactionRequired;
@@ -289,6 +296,7 @@ export function initializeIntranetWork(options = {}) {
     } finally { clearTimeout(timeout); if (generation === requestGeneration) { fetching = false; controller = null; controls(); } }
   }
   async function disconnect() {
+    clearNotificationSource(doc, 'work');
     autoRefresh.stop();
     const application = pca, oldAccount = account;
     connectionGeneration++;
@@ -309,6 +317,7 @@ export function initializeIntranetWork(options = {}) {
     if (authBusy) { formError('Patientez pendant la connexion ou la déconnexion de Microsoft.'); return; }
     const next = normalizeIntranetConfig({ clientId: get('#intranet-client-id').value, tenantId: get('#intranet-tenant-id').value, apiClientId: get('#intranet-api-client-id').value });
     if (!next) { formError('Renseignez les trois identifiants au format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.'); return; }
+    clearNotificationSource(doc, 'work');
     sdkGeneration++; connectionGeneration++;
     autoRefresh.stop();
     cancelRequests(); account = null; pca = null; config = next; needsReconnect = false;
@@ -334,6 +343,7 @@ export function initializeIntranetWork(options = {}) {
   bindSignOut();
   controls(); if (config) prepareSdk();
   return { disconnect, refresh, showSetup, dispose() {
+    clearNotificationSource(doc, 'work');
     disposed = true; pendingSharedAccount = null; autoRefresh.dispose(); sdkGeneration++; connectionGeneration++; cancelRequests();
     unsubscribeSignOut?.(); unsubscribeSignIn?.();
   } };

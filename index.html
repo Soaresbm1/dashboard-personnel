@@ -17,6 +17,7 @@
   <script src="workplace-tools.mjs" type="module"></script>
   <script src="weather.mjs" type="module"></script>
   <script src="transport.mjs" type="module"></script>
+  <script src="notifications.mjs" type="module"></script>
 </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:none">
@@ -25,6 +26,7 @@
     <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 10a8 8 0 1 1 1 7M4 4v6h6"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
     <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6m0-6L10 14M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
   </svg>
   <a class="skip-link" href="#main">Aller à la vue d’ensemble</a>
   <div class="dashboard-shell">
@@ -32,6 +34,7 @@
       <a class="brand" href="#overview" aria-label="Dashboard, vue d’ensemble"><svg class="icon" aria-hidden="true"><use href="#i-grid"/></svg><span>dashboard</span></a>
       <div class="topbar-right">
         <time id="top-date" class="date-label"></time>
+        <button id="notifications-open" class="icon-button notification-trigger" type="button" aria-haspopup="dialog" aria-controls="notifications-dialog" aria-label="Notifications, 0 non vues" title="Notifications regroupées"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg><span id="notifications-count" class="notification-count" aria-hidden="true" hidden>0</span></button>
         <details class="connection-menu">
           <summary><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span>Connexions</span></summary>
           <div class="connection-options">
@@ -144,6 +147,12 @@
       <footer class="page-footer"><span>Actualisation automatique · services 1 min · météo 15 min</span><span>Consultation en lecture seule</span></footer>
     </main>
   </div>
+
+  <dialog id="notifications-dialog" class="modal workplace-dialog notifications-dialog" aria-labelledby="notifications-title" aria-describedby="notifications-note">
+    <header class="modal-header"><div><h2 id="notifications-title">Notifications</h2><p id="notifications-summary" class="workplace-description" role="status" aria-live="polite">Aucune notification pour le moment</p></div><button id="notifications-close" type="button" class="icon-button" aria-label="Fermer les notifications"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></header>
+    <div class="workplace-body"><p id="notifications-note" class="workplace-description">Les mails non lus chargés et les nouveautés détectées depuis l’ouverture de cette page.</p><div id="notifications-items" class="workplace-list notifications-list" role="region" aria-label="Liste des notifications" tabindex="0"><p class="notifications-empty">Vous êtes à jour.</p></div></div>
+    <footer class="panel-footer"><span>Lecture propre au dashboard</span><button id="notifications-mark-all" class="text-button" type="button" disabled>Tout marquer comme vu</button></footer>
+  </dialog>
 
   <dialog id="transport-setup" class="modal workplace-dialog" aria-labelledby="transport-title" aria-describedby="transport-description">
     <header class="modal-header"><div><h2 id="transport-title" tabindex="-1">Pont des Parcs → Gare nord</h2><p id="transport-description" class="workplace-description">Vers Neuchâtel, gare nord · horaires et prévisions disponibles · actualisation chaque minute.</p></div><button id="transport-close" type="button" class="icon-button" aria-label="Fermer les transports"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></header>
