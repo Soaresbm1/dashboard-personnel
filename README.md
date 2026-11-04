@@ -36,9 +36,9 @@ Ces deux aperçus utilisent la même actualisation automatique et la même déco
 
 ## Résumé et ordre de priorité
 
-Une ligne discrète présente le prochain rendez-vous de la période sélectionnée, le nombre de tâches en retard et le nombre de tickets prioritaires (bloquants ou priorité élevée). Un rendez-vous en cours est signalé, les événements terminés sont écartés et les titres privés restent masqués. Les compteurs concernent les éléments ouverts reçus ; une limite de l’API est indiquée dans le résumé. « — » signifie que les données ne sont pas disponibles, tandis que « 0 » correspond à une lecture réussie sans élément concerné.
+Le résumé réunit le prochain rendez-vous de la période sélectionnée, les trois prochains départs de Vauseyon et la météo de Neuchâtel. Les anciens compteurs de tâches en retard et de tickets prioritaires ont été retirés de cette ligne. Un rendez-vous en cours est signalé, les événements terminés sont écartés et les titres privés restent masqués. « — » indique que l’agenda n’est pas disponible ; les transports et la météo ont leurs propres états de chargement et de panne.
 
-Les tâches et les tickets sont classés séparément : bloquants ou en retard, échéances du jour, priorités élevées, puis autres éléments. Dans chaque groupe, la priorité puis l’échéance la plus proche départagent les éléments, avec un ordre stable en cas d’égalité. Les éléments clôturés éventuellement reçus sont placés à la fin et exclus des compteurs d’urgence. Le résumé suit les actualisations, signale les données anciennes et s’efface avec les listes lors d’une déconnexion ou d’un refus d’accès.
+Les tâches et les tickets sont classés séparément dans leur panneau : bloquants ou en retard, échéances du jour, priorités élevées, puis autres éléments. Dans chaque groupe, la priorité puis l’échéance la plus proche départagent les éléments, avec un ordre stable en cas d’égalité. Les éléments clôturés éventuellement reçus sont placés à la fin. Le résumé de l’agenda suit les actualisations, signale les données anciennes et s’efface lors d’une déconnexion ou d’un refus d’accès ; les transports et la météo publics restent indépendants de Microsoft.
 
 ## Actualisation automatique
 
