@@ -3,6 +3,11 @@
   'use strict';
   const clean = value => String(value || '').normalize('NFKC').replace(/[\u2019\u2018]/g, "'").replace(/\s+/g, ' ').trim();
   const owner = 'Bernardo Miguel Soares (BMS)';
+  function within(element, ancestor) {
+    if (!ancestor) return false;
+    for (let p = element; p; p = p.parentElement || p.getRootNode?.().host) if (p === ancestor) return true;
+    return false;
+  }
   function today(now = Date.now()) {
     const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Zurich', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(now));
     const part = type => parts.find(p => p.type === type).value;
@@ -82,8 +87,8 @@
       personalContext: !!heading && personalLinks.length === 1,
       // This personal view currently has only its date picker. Any other selector
       // makes the employee context ambiguous, whatever its language or label.
-      employeeSelector: all('[role="combobox"],vaadin-combo-box,vaadin-select').some(e => !picker?.contains(e)),
+      employeeSelector: all('[role="combobox"],vaadin-combo-box,vaadin-select').some(e => !within(e, picker)),
       balanceRows: rows('Solde'), vacationRows: rows('Solde vacances en jours') };
   }
-  globalThis.MyAbacusLocalReader = Object.freeze({ clean, today, decimal, parse, collect });
+  globalThis.MyAbacusLocalReader = Object.freeze({ clean, today, decimal, parse, collect, within });
 })();
