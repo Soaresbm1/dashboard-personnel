@@ -4,6 +4,7 @@ import { OUTLOOK_CONFIG_KEY, normalizeOutlookConfig, retryAfterMilliseconds } fr
 import { MICROSOFT_DEPLOYMENT, getMicrosoftClient, getRememberedMicrosoftAccount, isDashboardMicrosoftAccount,
   rememberMicrosoftAccount, clearMicrosoftSession, subscribeMicrosoftSignOut, subscribeMicrosoftSignIn } from './microsoft-session.mjs';
 import { createAutoRefresh } from './auto-refresh.mjs';
+import { notificationIdentity, publishMailNotifications, clearNotificationSource, markNotificationSourceStale } from './notifications-core.mjs';
 
 // Mail metadata lives only in memory. Authentication and sign-out use the shared Microsoft session.
 export function initializeMailPreview(options = {}) {
@@ -58,6 +59,7 @@ export function initializeMailPreview(options = {}) {
   }
   function signedOut(pending = false) {
     if (disposed) return;
+    clearNotificationSource(doc, 'mail');
     sdkGeneration++; sdkLoading = false;
     autoRefresh.stop(); connectionGeneration++; account = null; needsReconnect = false; accessBlocked = false;
     signingOut = pending; authBusy = pending; cancelRequests({ resetThrottle: true });
@@ -85,6 +87,7 @@ export function initializeMailPreview(options = {}) {
       await refresh();
     } catch {
       if (disposed || generation !== sdkGeneration || connection !== connectionGeneration) return;
+      if (!account) clearNotificationSource(doc, 'mail');
       setStatus('La connexion Microsoft ne peut pas être préparée. Vérifiez votre connexion et réessayez.', 'error');
     } finally {
       if (!disposed && generation === sdkGeneration && connection === connectionGeneration) { sdkLoading = false; renderControls(); }
@@ -94,6 +97,7 @@ export function initializeMailPreview(options = {}) {
     if (disposed) return false;
     const next = readConfig();
     if (next?.clientId === config?.clientId && next?.tenantId === config?.tenantId) return false;
+    clearNotificationSource(doc, 'mail');
     autoRefresh.stop(); sdkGeneration++; connectionGeneration++; cancelRequests({ resetThrottle: true });
     account = null; pca = null; needsReconnect = false; accessBlocked = false; authBusy = false; signingOut = false; config = next;
     observeSignOut(); clearMessages('La configuration Microsoft a changé. Connectez de nouveau les mails Outlook.'); renderControls();
@@ -143,7 +147,7 @@ export function initializeMailPreview(options = {}) {
       authBusy = false; renderControls(); autoRefresh.start(); await refresh(response.accessToken || null);
     } catch (error) {
       if (generation !== connectionGeneration) return;
-      autoRefresh.stop(); account = null; clearMessages('Vos mails ne sont pas connectés.'); setStatus(loginError(error), 'error');
+      autoRefresh.stop(); account = null; clearNotificationSource(doc, 'mail'); clearMessages('Vos mails ne sont pas connectés.'); setStatus(loginError(error), 'error');
     } finally { if (generation === connectionGeneration) { authBusy = false; renderControls(); } }
   }
 
@@ -177,7 +181,7 @@ export function initializeMailPreview(options = {}) {
     renderControls();
     async function getJson(url, { messagesOnly = false } = {}) {
       const safeUrl = safeMailGraphUrl(url, { messagesOnly });
-      if (!safeUrl) throw new Error('Unsafe mail request');
+      if (!safeUrl) throw Object.assign(new Error('Unsafe mail request'), { unsafeResponse: true });
       const timeout = setTimeout(() => abortController.abort(), 20000);
       try {
         const response = await fetcher(safeUrl, { method: 'GET', headers: { Authorization: `Bearer ${token}` }, signal: abortController.signal, cache: 'no-store', credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer' });
@@ -186,27 +190,28 @@ export function initializeMailPreview(options = {}) {
           if (response.status === 429) error.retryAfter = retryAfterMilliseconds(response.headers.get('Retry-After'), nowMs());
           throw error;
         }
-        return await response.json();
+        try { return await response.json(); }
+        catch { throw Object.assign(new Error('Invalid mail response'), { unsafeResponse: true }); }
       } finally { clearTimeout(timeout); }
     }
     let token;
     try {
       token = accessToken || (await application.acquireTokenSilent({ account: signedInAccount, scopes: [...MAIL_SCOPES], redirectUri })).accessToken;
       if (generation !== requestGeneration) return;
-      if (!token) throw new Error('Missing mail access token');
+      if (!token) throw Object.assign(new Error('Missing mail access token'), { notificationAccessUnavailable: true });
       const folder = await getJson(inboxUnreadCountUrl());
       if (generation !== requestGeneration) return;
       const unreadCount = normalizeUnreadCount(folder.unreadItemCount);
-      if (unreadCount === null) throw new Error('Invalid inbox count');
+      if (unreadCount === null) throw Object.assign(new Error('Invalid inbox count'), { unsafeResponse: true });
       let page = mailListUrl(requestedFilter), pages = 0, values = [], messages = [];
       const visited = new Set();
       while (page && messages.length < MAIL_PREVIEW_LIMIT && pages < MAIL_PREVIEW_PAGES) {
         const safePage = safeMailGraphUrl(page, { messagesOnly: true });
-        if (!safePage || visited.has(safePage)) throw new Error('Unsafe mail pagination');
+        if (!safePage || visited.has(safePage)) throw Object.assign(new Error('Unsafe mail pagination'), { unsafeResponse: true });
         visited.add(safePage);
         const body = await getJson(safePage, { messagesOnly: true });
         if (generation !== requestGeneration) return;
-        if (!Array.isArray(body.value)) throw new Error('Invalid mail response');
+        if (!Array.isArray(body.value)) throw Object.assign(new Error('Invalid mail response'), { unsafeResponse: true });
         values.push(...body.value.slice(0, 100));
         messages = normalizeMailMessages(values, requestedFilter); pages++; page = body['@odata.nextLink'] || null;
       }
@@ -218,6 +223,7 @@ export function initializeMailPreview(options = {}) {
         else renderMessages(messages);
       }
       lastGood = { account: signedInAccount, filter: requestedFilter, at, messages, unreadCount, signature };
+      publishMailNotifications(doc, { identity: notificationIdentity(signedInAccount, config), filter: requestedFilter, messages, at, limited, unreadCount });
       accessBlocked = false;
       renderUnreadCount(unreadCount);
       get('#mail-last-updated').textContent = `Actualisé le ${exactTime(at)}`;
@@ -227,6 +233,9 @@ export function initializeMailPreview(options = {}) {
     } catch (error) {
       if (generation !== requestGeneration) return;
       const interactionRequired = sdk?.InteractionRequiredAuthError && error instanceof sdk.InteractionRequiredAuthError;
+      if (interactionRequired || ['interaction_required', 'login_required', 'consent_required'].includes(error?.errorCode)
+          || [401, 403].includes(error.httpStatus) || error.unsafeResponse || error.notificationAccessUnavailable) clearNotificationSource(doc, 'mail');
+      else markNotificationSourceStale(doc, 'mail');
       if (interactionRequired || ['interaction_required', 'login_required', 'consent_required'].includes(error?.errorCode) || error.httpStatus === 401) {
         autoRefresh.stop(); needsReconnect = true; clearMessages('Autorisez la lecture des mails pour afficher cet aperçu.');
         setStatus('La session ou l’autorisation des mails doit être renouvelée. Cliquez sur « Autoriser les mails Outlook ».', 'error');
@@ -261,6 +270,7 @@ export function initializeMailPreview(options = {}) {
   const onConfigSubmit = () => queueMicrotask(configChanged);
   const onForgetConfig = () => {
     if (disposed) return;
+    clearNotificationSource(doc, 'mail');
     autoRefresh.stop(); sdkGeneration++; connectionGeneration++; cancelRequests({ resetThrottle: true });
     account = null; pca = null; sdkLoading = false; needsReconnect = false; accessBlocked = false;
     // The agenda removes the saved identifiers after its shared sign-out completes.
@@ -278,6 +288,7 @@ export function initializeMailPreview(options = {}) {
   setStatus('Une autorisation Mail.ReadBasic permet cet aperçu en lecture seule.'); renderControls();
   if (config) { observeSignOut(); prepareSdk(); }
   return { connect, refresh, disconnect, dispose() {
+    clearNotificationSource(doc, 'mail');
     disposed = true; sdkGeneration++; connectionGeneration++;
     autoRefresh.dispose(); cancelRequests({ resetThrottle: true }); unsubscribeSignOut?.(); unsubscribeSignIn?.(); win.removeEventListener?.('storage', onStorage);
     get('#outlook-config-form')?.removeEventListener?.('submit', onConfigSubmit); get('#outlook-forget-config')?.removeEventListener?.('click', onForgetConfig);

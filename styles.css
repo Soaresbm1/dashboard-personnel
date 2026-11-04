@@ -36,6 +36,23 @@ h1, h2, h3, p { margin: 0; }
 .brand .icon { width: 20px; height: 20px; stroke-width: 1.5; }
 .brand:hover { text-decoration: none; }
 .topbar-right { display: flex; align-items: center; gap: 22px; }
+.notification-trigger { position: relative; }
+.notification-count { position: absolute; top: -5px; right: -6px; min-width: 17px; padding: 1px 4px; border-radius: 9px; background: var(--ink); color: var(--surface); font-size: 9px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.notifications-list { max-height: min(430px, calc(100dvh - 320px)); }
+.notification-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 14px; padding: 14px 0; border-top: 1px solid var(--line); }
+.notification-item:first-child { border-top: 0; }
+.notification-heading { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.notification-label, .notification-date { color: var(--muted); font-size: 10px; line-height: 1.5; }
+.notification-date { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.notification-body { min-width: 0; }
+.notification-title { font-size: 12px; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; }
+.notification-detail, .notification-stale, .notifications-empty { color: var(--muted); font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
+.notification-detail { margin-top: 2px; }
+.notification-stale { margin-top: 4px; font-style: italic; }
+.notification-seen { align-self: start; min-height: 30px; padding: 3px 0 3px 8px; color: var(--muted); font-size: 10px; white-space: nowrap; text-decoration: underline; text-underline-offset: 3px; }
+.notification-seen:disabled { text-decoration: none; }
+.notification-item[data-seen="true"] .notification-title { font-weight: 400; }
+.notifications-empty { padding: 16px 0; }
 main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .connection-menu { position: relative; }
 .connection-menu > summary { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 0 8px 8px; color: #555552; font-size: 12px; cursor: pointer; list-style: none; }
@@ -244,6 +261,9 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
   .overview-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
 }
 @media (max-width: 520px) {
+  .topbar-right { gap: 12px; }
+  .notification-item { grid-template-columns: minmax(0, 1fr); gap: 5px; }
+  .notification-seen { justify-self: start; min-height: 38px; padding-left: 0; }
   .workplace-tools { margin-left: 0; }
   .workplace-tools > button { min-height: 38px; }
   .workplace-body { padding: 14px 20px 0; }

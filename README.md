@@ -100,6 +100,14 @@ Le chargement se fait à l’ouverture, puis toutes les 15 minutes lorsque la pa
 
 Documentation : [API et codes météo](https://open-meteo.com/en/docs), [conditions d’utilisation personnelle et attribution](https://open-meteo.com/en/terms).
 
+## Notifications regroupées
+
+Une cloche dans l’en-tête ouvre les notifications du dashboard. Elle rassemble les mails non lus présents dans l’aperçu, puis les nouvelles attributions de tâches/tickets, les changements de titre, statut, priorité ou échéance et les nouvelles publications détectées pendant que cette page est ouverte. Le premier chargement des tâches et des actualités établit une référence silencieuse. Les nouvelles attributions ne sont signalées qu’après une référence complète ; une ancienne publication réexposée ou un changement de filtre mail ne devient pas une fausse nouveauté.
+
+Le centre réutilise les objets normalisés des trois services, sans nouvelle requête ni permission. L’aperçu mail et la dernière publication gardent leurs limites existantes ; le centre ne constitue pas un historique exhaustif. Il conserve jusqu’à 30 notifications, dédupliquées par élément, avec des registres d’identifiants bornés. **Marquer comme vue** et **Tout marquer comme vu** concernent uniquement le dashboard : aucun mail, ticket ou publication n’est modifié.
+
+Les titres, liens et états restent uniquement en mémoire pour cette page, sans corps de mail, contenu HTML de publication ni jeton. Une déconnexion, un changement de configuration, une révocation ou une réponse non sûre retire les informations de la source concernée. Une panne transitoire les conserve avec une indication explicite de données anciennes. Le changement d’identité efface le centre pour éviter tout mélange de comptes ; fermer ou recharger la page réinitialise cette vue.
+
 ## Transports publics — Pont des Parcs vers Neuchâtel, gare nord
 
 Le résumé affiche directement les **trois prochains départs de Pont des Parcs vers Neuchâtel, gare nord**, à côté de la météo, à la place des anciens compteurs de tâches en retard et tickets prioritaires. Chaque ligne indique la ligne de bus, la destination, **départ → arrivée à la gare**, puis le compte à rebours. Le lien **Tous les départs** ouvre les six prochains bus depuis l’arrêt exact **Neuchâtel, Pont des Parcs**, identifiant `8593564`, avec destination, heure prévue et prévision/retard lorsqu’ils sont fournis. Seules les courses dont la destination est **Neuchâtel, gare nord** sont conservées ; les deux sens du même numéro de ligne ne sont jamais confondus. La requête charge jusqu’à 30 départs de l’arrêt avant filtrage. Les deux vues partagent la même requête et s’actualisent ensemble. Les heures sont affichées dans le fuseau `Europe/Zurich`. Un simple horaire n’est pas présenté comme une prévision et aucune information d’annulation non fournie n’est déduite.
