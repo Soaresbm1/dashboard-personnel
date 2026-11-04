@@ -1,33 +1,27 @@
-import { SESSION_KEY, validateRequest, transition } from './protocol.mjs';
+import { createCaptureManager } from './capture-manager.mjs';
 
-// One queue includes reads and writes, so delayed storage cannot reorder documents.
-export function createMessageHandler({ extensionId, storage, now = Date.now, ready = Promise.resolve() }) {
-  let tail = Promise.resolve();
-  return (message, sender) => {
-    const result = tail.then(async () => {
-      await ready;
-      const at = now();
-      if (!Number.isSafeInteger(at) || at < 0) return { ok: false, error: 'unavailable' };
-      const request = validateRequest(message, sender, { extensionId, now: at });
-      if (!request.ok) return request;
-      const saved = await storage.get(SESSION_KEY);
-      const { state, response } = transition(saved?.[SESSION_KEY], request, at);
-      if (state) await storage.set({ [SESSION_KEY]: state });
-      else await storage.remove(SESSION_KEY);
-      return response;
-    });
-    tail = result.catch(() => {});
-    return result.catch(() => ({ ok: false, error: 'unavailable' }));
-  };
+export function createMessageHandler(options) {
+  const manager = createCaptureManager(options);
+  const handle = manager.handle;
+  for (const name of ['afterResponse', 'recover', 'handleAlarm', 'handleActivated', 'handleRemoved', 'idle']) handle[name] = manager[name];
+  return handle;
 }
 
 if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage && chrome.storage?.session) {
   const ready = chrome.storage.session.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
-  // Preserve a rejected setup result for fail-closed handling without an unhandled rejection.
   ready.catch(() => {});
-  const handle = createMessageHandler({ extensionId: chrome.runtime.id, storage: chrome.storage.session, ready });
+  const handle = createMessageHandler({ extensionId: chrome.runtime.id, storage: chrome.storage.session,
+    tabs: chrome.tabs, alarms: chrome.alarms, ready });
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    handle(message, sender).then(sendResponse);
+    handle(message, sender).then(response => {
+      sendResponse(response);
+      // DONE/FAILURE are acknowledged before closing the sending tab.
+      if (response?.ok && ['MYABACUS_DONE', 'MYABACUS_FAILURE', 'MYABACUS_STOP'].includes(message?.type)) void handle.afterResponse(message, sender);
+    });
     return true;
   });
+  chrome.alarms?.onAlarm.addListener(alarm => { void handle.handleAlarm(alarm); });
+  chrome.tabs?.onActivated.addListener(info => { void handle.handleActivated(info); });
+  chrome.tabs?.onRemoved.addListener(tabId => { void handle.handleRemoved(tabId); });
+  void handle.recover();
 }

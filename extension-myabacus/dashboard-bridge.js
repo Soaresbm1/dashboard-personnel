@@ -7,14 +7,16 @@
   window.addEventListener('message', async event => {
     const message = event.data;
     if (!allowed() || event.source !== window || event.origin !== origin || !message || Object.keys(message).length !== 3
-      || message.channel !== channel || message.type !== 'REQUEST' || typeof message.requestId !== 'string'
-      || !/^[\w-]{16,64}$/.test(message.requestId) || pending || Date.now() - lastRequest < 500) return;
-    pending = true; lastRequest = Date.now();
+      || message.channel !== channel || !['REQUEST', 'FORCE', 'STOP'].includes(message.type) || typeof message.requestId !== 'string'
+      || !/^[\w-]{16,64}$/.test(message.requestId) || message.type === 'REQUEST' && (pending || Date.now() - lastRequest < 500)) return;
+    const control = message.type !== 'REQUEST';
+    if (!control) { pending = true; lastRequest = Date.now(); }
     try {
-      const result = await chrome.runtime.sendMessage({ type: 'MYABACUS_READ' });
+      const type = { REQUEST: 'MYABACUS_READ', FORCE: 'MYABACUS_CAPTURE', STOP: 'MYABACUS_STOP' }[message.type];
+      const result = await chrome.runtime.sendMessage({ type });
       if (allowed()) window.postMessage({ channel, type: 'RESULT', requestId: message.requestId, result }, origin);
     } catch {
       if (allowed()) window.postMessage({ channel, type: 'RESULT', requestId: message.requestId, result: { ok: false } }, origin);
-    } finally { pending = false; }
+    } finally { if (!control) pending = false; }
   });
 })();

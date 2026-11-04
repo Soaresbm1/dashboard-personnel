@@ -120,7 +120,7 @@ La source [opentransportdata.swiss](https://opentransportdata.swiss/) et l’API
 
 ## MyAbacus local
 
-Le résumé comprend un bloc compact pour le solde d’heures et les congés. Il utilise l’extension Edge personnelle `extension-myabacus`, à charger séparément dans le même profil que le dashboard. Aucun appel vers une API Abacus ni ajout de permission Microsoft. Les soldes restent locaux et temporaires ; le bloc est vidé à la déconnexion Microsoft. La date « Lu à » indique la lecture du document MyAbacus, sans garantir un recalcul serveur. Une source absente expire en 90 secondes et une lecture de plus de 15 minutes est signalée. Consulter le README de l’extension pour l’installation, les restrictions et les tests.
+Le résumé comprend un bloc compact pour le solde d’heures et les congés. L’extension Edge personnelle `extension-myabacus` 1.1.0 ouvre un onglet MyAbacus temporaire en arrière-plan environ toutes les dix minutes tant que le dashboard est ouvert et connecté, puis referme uniquement cet onglet après lecture. Les onglets préexistants ne sont pas manipulés et la prise en main de l’onglet temporaire empêche sa fermeture automatique. Aucun appel direct vers une API Abacus ni ajout de permission Microsoft. Les soldes restent locaux et temporaires, avec une validité maximale de quinze minutes et une date de lecture visible. Le bloc et le cache sont purgés à la déconnexion Microsoft. Une session MyAbacus expirée nécessite une reconnexion manuelle ; le bouton « Actualiser maintenant » relance ensuite une lecture. Les alarmes servent au nettoyage des traitements, sans lancer de lecture lorsque le dashboard est fermé. Consulter le README de l’extension pour l’installation, les restrictions et les tests.
 
 ## Publication avec GitHub Pages
 
