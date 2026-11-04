@@ -8,7 +8,7 @@ export const MICROSOFT_DEPLOYMENT = Object.freeze({
 const clientsByWindow = new WeakMap();
 const listenersByWindow = new WeakMap();
 const signInStatesByWindow = new WeakMap();
-export const MICROSOFT_GRAPH_SCOPES = Object.freeze(['Calendars.ReadBasic', 'Mail.ReadBasic']);
+export const MICROSOFT_GRAPH_SCOPES = Object.freeze(['Calendars.ReadBasic', 'Mail.ReadBasic', 'Place.Read.All']);
 export const microsoftSessionKey = config => `mon-espace-microsoft-session-v1:${config.clientId}:${config.tenantId}`;
 
 function sessionState(win, key) {
