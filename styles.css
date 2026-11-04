@@ -130,9 +130,10 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .transport-inline-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: baseline; gap: 8px; font-size: 11px; line-height: 1.5; }
 .transport-inline-line { font-weight: 600; }
 .transport-inline-destination { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.transport-inline-timing { display: inline-flex; align-items: baseline; gap: 7px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.transport-inline-timing { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .transport-inline-timing time { color: var(--muted); font-size: 10px; }
-.transport-inline-countdown { min-width: 45px; text-align: right; font-weight: 600; }
+.transport-inline-arrow, .transport-inline-arrival { color: var(--muted); font-size: 10px; }
+.transport-inline-countdown { min-width: 40px; text-align: right; font-weight: 600; }
 .transport-inline-delay { margin-left: 5px; color: var(--muted); font-size: 10px; }
 .transport-inline-empty, .transport-inline-notice { color: var(--muted); font-size: 10px; line-height: 1.5; }
 .transport-inline-notice { margin-top: 2px; }
