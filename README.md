@@ -118,6 +118,10 @@ L’API publique [Opendata.ch](https://transport.opendata.ch/docs.html) est inte
 
 La source [opentransportdata.swiss](https://opentransportdata.swiss/) et l’API sont citées dans la fenêtre des départs. L’intégration ne change aucune permission Microsoft ou route de l’intranet.
 
+## MyAbacus local
+
+Le résumé comprend un bloc compact pour le solde d’heures et les congés. Il utilise l’extension Edge personnelle `extension-myabacus`, à charger séparément dans le même profil que le dashboard. Aucun appel vers une API Abacus ni ajout de permission Microsoft. Les soldes restent locaux et temporaires ; le bloc est vidé à la déconnexion Microsoft. La date « Lu à » indique la lecture du document MyAbacus, sans garantir un recalcul serveur. Une source absente expire en 90 secondes et une lecture de plus de 15 minutes est signalée. Consulter le README de l’extension pour l’installation, les restrictions et les tests.
+
 ## Publication avec GitHub Pages
 
 Les fichiers du site sont à la racine du dépôt. Dans **Settings → Pages**, choisissez **Deploy from a branch**, puis la branche **main** et le dossier **/ (root)**. Aucun build ni dépendance n’est nécessaire.

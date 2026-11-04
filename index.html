@@ -18,6 +18,7 @@
   <script src="weather.mjs" type="module"></script>
   <script src="transport.mjs" type="module"></script>
   <script src="notifications.mjs" type="module"></script>
+  <script src="myabacus.mjs" type="module"></script>
 </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:none">
@@ -69,6 +70,10 @@
         <div id="summary-weather" class="summary-item weather-summary" data-state="loading">
           <dt><span>Météo · Neuchâtel</span><a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" class="weather-source" aria-label="Source météo : Open-Meteo">Open-Meteo</a></dt>
           <dd><span class="summary-value weather-value"><span id="weather-temperature">—</span><span id="weather-condition" class="weather-condition"></span></span><span id="weather-detail" class="summary-detail">Chargement de la météo…</span><span id="weather-status" class="sr-only" role="status" aria-live="polite">Chargement de la météo de Neuchâtel.</span></dd>
+        </div>
+        <div id="summary-myabacus" class="summary-item myabacus-summary" data-state="loading">
+          <dt><span>MyAbacus</span><button id="myabacus-open" type="button" aria-haspopup="dialog" aria-controls="myabacus-setup">Connexion locale</button></dt>
+          <dd><div class="myabacus-values"><span><span id="myabacus-hours" class="summary-value">—</span><span class="myabacus-label">Solde d’heures</span></span><span><span id="myabacus-vacation" class="summary-value">—</span><span class="myabacus-label">Congés restants</span></span></div><span id="myabacus-detail" class="summary-detail">Préparation de la lecture locale…</span><span id="myabacus-last-read" class="myabacus-last-read"></span><span id="myabacus-status" class="sr-only" role="status" aria-live="polite">Préparation de MyAbacus.</span></dd>
         </div>
       </dl>
       <nav class="quick-access" aria-label="Accès rapides">
@@ -147,6 +152,12 @@
       <footer class="page-footer"><span>Actualisation automatique · services 1 min · météo 15 min</span><span>Consultation en lecture seule</span></footer>
     </main>
   </div>
+
+  <dialog id="myabacus-setup" class="modal workplace-dialog" aria-labelledby="myabacus-title" aria-describedby="myabacus-description">
+    <header class="modal-header"><div><h2 id="myabacus-title">MyAbacus · connexion locale</h2><p id="myabacus-description" class="workplace-description">Tes compteurs personnels, lus sur ton appareil.</p></div><button id="myabacus-close" type="button" class="icon-button" aria-label="Fermer les paramètres MyAbacus"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></header>
+    <div class="workplace-body myabacus-help"><ol><li>Dans Edge, ouvre <strong>Extensions → Gérer les extensions</strong>, active le mode développeur puis choisis <strong>Charger l’extension non empaquetée</strong>. Sélectionne le dossier <code>extension-myabacus</code> fourni.</li><li>Recharge ce dashboard et ouvre <a href="https://abaprod.isp-spi.ch/portal/myabacus/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">MyAbacus</a> dans le même profil Edge.</li><li>Connecte-toi puis affiche <strong>In &amp; Out</strong>, en français, à la date d’aujourd’hui. Garde cette page ouverte.</li></ol><p>Lecture des seuls soldes affichés : heures, vacances restantes et vacances disponibles après planification. Aucune modification dans MyAbacus ; aucun mot de passe ni jeton récupéré.</p><p>Les données restent dans ce profil de navigateur, temporairement. La lecture suit les compteurs affichés ; elle ne déclenche pas leur recalcul sur le serveur MyAbacus. La date de lecture reste visible dans le bloc.</p><p>Après fermeture ou déconnexion de MyAbacus, les compteurs disparaissent du dashboard au plus tard après 90 secondes. Une présentation du portail non reconnue interrompt la lecture.</p></div>
+    <footer class="panel-footer"><a href="https://abaprod.isp-spi.ch/portal/myabacus/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir MyAbacus <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span>Lecture locale uniquement</span></footer>
+  </dialog>
 
   <dialog id="notifications-dialog" class="modal workplace-dialog notifications-dialog" aria-labelledby="notifications-title" aria-describedby="notifications-note">
     <header class="modal-header"><div><h2 id="notifications-title">Notifications</h2><p id="notifications-summary" class="workplace-description" role="status" aria-live="polite">Aucune notification pour le moment</p></div><button id="notifications-close" type="button" class="icon-button" aria-label="Fermer les notifications"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></header>
