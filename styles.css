@@ -137,6 +137,15 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .summary-item dd { margin: 0; }
 .summary-value { display: block; margin-top: 3px; font-size: 22px; font-weight: 600; letter-spacing: -.5px; line-height: 1.2; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .summary-detail { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.github-strip { display: grid; grid-template-columns: 52px repeat(2, minmax(0, 1fr)) 30px; align-items: center; flex-shrink: 0; gap: 14px; margin-bottom: 10px; padding: 9px 14px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+.github-strip h2 { margin: 0; font-size: 12px; font-weight: 600; }
+.github-project { min-width: 0; }
+.github-project + .github-project { padding-left: 14px; border-left: 1px solid var(--line); }
+.github-project-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; font-size: 10px; line-height: 1.6; }
+.github-project-name { font-size: 11px; font-weight: 600; }
+.github-deployment { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.github-deployment:not([href]) { color: var(--muted); text-decoration: none; }
+.github-checked { color: var(--muted); font-size: 9px; white-space: nowrap; }
 .summary-appointment { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 10px; }
 .teams-join { display: inline-flex; align-items: center; justify-content: center; min-height: 24px; padding: 2px 7px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); font-size: 10px; font-weight: 500; line-height: 1.4; text-decoration: none; white-space: nowrap; }
 .teams-join:hover { background: #f3f3f0; }
@@ -283,6 +292,11 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
   .summary-item.weather-summary { border-left: 0; padding-left: 0; }
 }
 @media (max-width: 520px) {
+  .github-strip { grid-template-columns: minmax(0, 1fr) 40px; gap: 8px; padding: 12px; }
+  .github-strip h2 { grid-column: 1; }
+  .github-strip > .icon-button { grid-column: 2; grid-row: 1; }
+  .github-project { grid-column: 1 / -1; }
+  .github-project + .github-project { padding: 8px 0 0; border-left: 0; border-top: 1px solid var(--line); }
   .topbar-right { gap: 12px; }
   .notification-item { grid-template-columns: minmax(0, 1fr); gap: 5px; }
   .notification-seen { justify-self: start; min-height: 38px; padding-left: 0; }
