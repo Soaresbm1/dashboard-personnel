@@ -15,6 +15,7 @@
   <script src="mail.js" type="module"></script>
   <script src="news.js" type="module"></script>
   <script src="workplace-tools.mjs" type="module"></script>
+  <script src="weather.mjs" type="module"></script>
 </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:none">
@@ -64,6 +65,10 @@
         <div id="summary-tickets" class="summary-item">
           <dt>Tickets prioritaires</dt>
           <dd><span id="summary-tickets-value" class="summary-value">—</span><span id="summary-tickets-detail" class="summary-detail">Chargement de l’intranet…</span></dd>
+        </div>
+        <div id="summary-weather" class="summary-item weather-summary" data-state="loading">
+          <dt><span>Météo · Neuchâtel</span><a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" class="weather-source" aria-label="Source météo : Open-Meteo">Open-Meteo</a></dt>
+          <dd><span class="summary-value weather-value"><span id="weather-temperature">—</span><span id="weather-condition" class="weather-condition"></span></span><span id="weather-detail" class="summary-detail">Chargement de la météo…</span><span id="weather-status" class="sr-only" role="status" aria-live="polite">Chargement de la météo de Neuchâtel.</span></dd>
         </div>
       </dl>
       <nav class="quick-access" aria-label="Accès rapides">
@@ -139,7 +144,7 @@
           <footer class="panel-footer"><a href="https://intranet.isp-spi.ch/intranet" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir l’intranet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="news-last-updated"></span></footer>
         </section>
       </div>
-      <footer class="page-footer"><span>Actualisation automatique · 1 min</span><span>Consultation en lecture seule</span></footer>
+      <footer class="page-footer"><span>Actualisation automatique · services 1 min · météo 15 min</span><span>Consultation en lecture seule</span></footer>
     </main>
   </div>
 
