@@ -1,13 +1,13 @@
 export const SESSION_KEY = 'myabacus-capture-v1';
 export const HEARTBEAT_TTL_MS = 90_000; // Legacy export; capture validity does not depend on heartbeats.
-export const CAPTURE_TTL_MS = 15 * 60_000;
+export const CAPTURE_TTL_MS = 15 * 60_000; // Legacy export; last-good values remain in session until explicitly cleared.
 export const CAPTURE_INTERVAL_MS = 10 * 60_000;
 export const FORCE_INTERVAL_MS = 30_000;
 export const CAPTURE_DEADLINE_MS = 60_000;
 export const CLEANUP_ALARM = 'myabacus-capture-cleanup-v1';
 export const SOURCE_URL = 'https://abaprod.isp-spi.ch/portal/myabacus/';
 export const MAX_MESSAGE_BYTES = 4_096;
-export const VERSION = '1.1.0';
+export const VERSION = '1.1.1';
 
 const SOURCE_ORIGIN = 'https://abaprod.isp-spi.ch';
 const DASHBOARD_ORIGIN = 'https://soaresbm1.github.io';
@@ -40,12 +40,15 @@ export function zurichDate(now) {
   }).formatToParts(new Date(now));
   return ['year', 'month', 'day'].map(type => parts.find(part => part.type === type)?.value).join('-');
 }
-export function validateSnapshot(snapshot, now) {
+function validSnapshotValues(snapshot) {
   return keysAre(snapshot, SNAPSHOT_KEYS) && snapshot.schemaVersion === 1
-    && validDate(snapshot.sourceDate) && snapshot.sourceDate === zurichDate(now)
+    && validDate(snapshot.sourceDate)
     && boundedDecimal(snapshot.timeBalanceHours, 10_000)
     && boundedDecimal(snapshot.vacationRemainingDays, 3_660)
     && (snapshot.vacationAvailableDays === null || boundedDecimal(snapshot.vacationAvailableDays, 3_660));
+}
+export function validateSnapshot(snapshot, now) {
+  return validSnapshotValues(snapshot) && snapshot.sourceDate === zurichDate(now);
 }
 export function copySnapshot(snapshot) {
   return Object.fromEntries(SNAPSHOT_KEYS.map(key => [key, snapshot[key]]));
@@ -94,9 +97,10 @@ export function validateRequest(message, sender, { extensionId, now }) {
     ...(publishing ? { snapshot: copySnapshot(message.snapshot) } : {}), ...(failure ? { reason: message.reason } : {}) };
 }
 export function liveSnapshot(value, now) {
-  if (!keysAre(value, [...SNAPSHOT_KEYS, 'readAt', 'seenAt']) || !validateSnapshot(copySnapshot(value), now)
+  if (!keysAre(value, [...SNAPSHOT_KEYS, 'readAt', 'seenAt']) || !validSnapshotValues(copySnapshot(value))
+    || value.sourceDate > zurichDate(now)
     || !Number.isSafeInteger(value.readAt) || value.readAt < 0 || value.seenAt !== value.readAt
-    || now < value.readAt || now - value.readAt >= CAPTURE_TTL_MS) return null;
+    || now < value.readAt) return null;
   return { ...copySnapshot(value), readAt: value.readAt, seenAt: value.seenAt };
 }
 export function emptyCaptureState() {

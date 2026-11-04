@@ -1,4 +1,4 @@
-import { SESSION_KEY, SOURCE_URL, CLEANUP_ALARM, CAPTURE_INTERVAL_MS, FORCE_INTERVAL_MS, CAPTURE_DEADLINE_MS, CAPTURE_TTL_MS,
+import { SESSION_KEY, SOURCE_URL, CLEANUP_ALARM, CAPTURE_INTERVAL_MS, FORCE_INTERVAL_MS, CAPTURE_DEADLINE_MS,
   validateRequest, restoreState, publicState, copySnapshot, sameOwner } from './protocol.mjs';
 
 export function createCaptureManager({ extensionId, storage, tabs, alarms, now = Date.now, ready = Promise.resolve() }) {
@@ -17,10 +17,9 @@ export function createCaptureManager({ extensionId, storage, tabs, alarms, now =
   }
   const load = async at => restoreState((await storage.get(SESSION_KEY))?.[SESSION_KEY], at);
   const synchronizeAlarm = async state => {
-    const deadlines = [state.job?.deadlineAt, state.snapshot ? state.snapshot.readAt + CAPTURE_TTL_MS : null].filter(Number.isSafeInteger);
-    if (deadlines.length) {
+    if (state.job) {
       if (!alarms?.create) throw new Error('Cleanup unavailable');
-      await alarms.create(CLEANUP_ALARM, { when: Math.min(...deadlines) });
+      await alarms.create(CLEANUP_ALARM, { when: state.job.deadlineAt });
     } else if (alarms?.clear) await alarms.clear(CLEANUP_ALARM);
   };
   const save = async state => { await storage.set({ [SESSION_KEY]: state }); await synchronizeAlarm(state); };
@@ -119,7 +118,7 @@ export function createCaptureManager({ extensionId, storage, tabs, alarms, now =
         job.phase = 'closing'; await save(state); return { ok: true, state: 'captured' };
       }
       if (request.type === 'MYABACUS_FAILURE') {
-        const account = ['account', 'context'].includes(request.reason);
+        const account = request.reason === 'account';
         if (account) state.snapshot = null;
         state.captureState = 'attention'; state.reason = account ? 'account' : 'unavailable';
         job.phase = 'closing'; await save(state); return { ok: true, state: 'attention' };

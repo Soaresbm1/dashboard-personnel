@@ -4,7 +4,7 @@ import {
 } from './microsoft-session.mjs';
 import {
   MYABACUS_CHANNEL, MYABACUS_READ_STALE_MS, normalizeMyAbacusResult,
-  myAbacusExpiry, formatMyAbacusHours, formatMyAbacusDays
+  myAbacusExpiry, myAbacusZurichDate, myAbacusNextDateChange, formatMyAbacusHours, formatMyAbacusDays
 } from './myabacus-core.mjs';
 
 export function initializeMyAbacus(options = {}) {
@@ -29,7 +29,7 @@ export function initializeMyAbacus(options = {}) {
   // Only the existing Microsoft preference is read. Balances never enter web storage.
   try { storage = Object.hasOwn(options, 'storage') ? options.storage : win.localStorage; } catch { /* Session remains unavailable. */ }
   let application = null, disposed = false, signOutPending = false, generation = 0;
-  let pending = null, pollTimer = null, expiryTimer = null, staleTimer = null, displayed = null;
+  let pending = null, pollTimer = null, expiryTimer = null, staleTimer = null, displayed = null, lastGood = null;
   let viewCaptureState = 'idle', stoppedForSignOut = false, ownerSessionActive = false;
   const clearTimer = timer => { if (timer !== null) win.clearTimeout(timer); };
   function clearDisplayTimers() { clearTimer(expiryTimer); clearTimer(staleTimer); expiryTimer = staleTimer = null; }
@@ -56,7 +56,7 @@ export function initializeMyAbacus(options = {}) {
     catch { /* Local values are cleared even if the extension is unavailable. */ }
   }
   function empty(state, message, captureState = 'idle') {
-    clearDisplayTimers(); displayed = null;
+    clearDisplayTimers(); displayed = null; lastGood = null;
     viewCaptureState = captureState;
     hours.textContent = vacation.textContent = '—';
     if (detail) { detail.textContent = message; detail.hidden = false; }
@@ -69,9 +69,11 @@ export function initializeMyAbacus(options = {}) {
     if (result.captureState === 'attention') { empty('empty', 'Connexion MyAbacus à vérifier', 'attention'); return; }
     empty('empty', 'MyAbacus à actualiser');
   }
-  function renderSnapshot(result) {
+  function renderSnapshot(result, receptionFailed = false) {
     clearDisplayTimers(); displayed = result.snapshot;
-    viewCaptureState = result.mode === 'capture' ? result.captureState : 'idle';
+    const capture = result.mode === 'capture', state = receptionFailed ? 'stale' : result.state;
+    lastGood = capture ? result : null;
+    viewCaptureState = receptionFailed ? 'attention' : capture ? result.captureState : 'idle';
     const snapshot = displayed;
     hours.textContent = formatMyAbacusHours(snapshot.timeBalanceHours);
     vacation.textContent = formatMyAbacusDays(snapshot.vacationRemainingDays);
@@ -81,13 +83,17 @@ export function initializeMyAbacus(options = {}) {
     }
     if (lastRead) {
       const [year, month, day] = snapshot.sourceDate.split('-');
-      const reading = result.mode === 'capture' ? 'toutes les 10 min' : `données du ${day}.${month}`;
-      lastRead.textContent = `Lu à ${clock.format(new Date(snapshot.readAt))} · ${reading}${result.state === 'stale' ? ' · lecture ancienne' : ''}`;
+      const reading = capture ? 'toutes les 10 min' : `données du ${day}.${month}`;
+      const time = clock.format(new Date(snapshot.readAt));
+      const stamp = capture && snapshot.sourceDate !== myAbacusZurichDate(now())
+        ? `Données du ${day}.${month}.${year} · lu à ${time}` : `Lu à ${time} · ${reading}`;
+      lastRead.textContent = `${stamp}${state === 'stale' ? ' · lecture ancienne' : ''}`;
       lastRead.setAttribute?.('datetime', new Date(snapshot.readAt).toISOString());
       lastRead.title = `Données du ${day}.${month}.${year} · lecture locale de MyAbacus`;
     }
-    block.dataset.state = result.state;
-    status.textContent = result.state === 'stale' ? `Dernière lecture ancienne${result.mode === 'capture' ? ' · connexion MyAbacus à vérifier' : ''}`
+    block.dataset.state = state;
+    status.textContent = receptionFailed ? 'Dernières données conservées · actualisation indisponible'
+      : state === 'stale' ? `Dernière lecture ancienne${capture && result.captureState === 'attention' ? ' · connexion MyAbacus à vérifier' : ''}`
       : viewCaptureState === 'reading' ? 'Lecture de MyAbacus…' : 'Lecture locale';
     updateControls();
     const expire = () => {
@@ -95,15 +101,29 @@ export function initializeMyAbacus(options = {}) {
       if (!hasOwner()) { stopCapture(); invalidate(); stopPolling(); empty('disconnected', 'Connectez Microsoft'); return; }
       renderEmpty(result);
     };
-    expiryTimer = win.setTimeout(expire, Math.max(0, myAbacusExpiry(snapshot, now(), result.mode) - now()));
-    if (result.mode !== 'capture' && result.state !== 'stale') {
-      staleTimer = win.setTimeout(() => {
+    const repaint = () => {
         if (disposed || displayed !== snapshot) return;
         if (!hasOwner()) { stopCapture(); invalidate(); stopPolling(); empty('disconnected', 'Connectez Microsoft'); return; }
-        const next = normalizeMyAbacusResult({ ok: true, state: 'ready', snapshot }, now());
-        if (next) renderSnapshot(next); else expire();
-      }, Math.max(0, snapshot.readAt + MYABACUS_READ_STALE_MS - now()));
+        const next = normalizeMyAbacusResult({ ...result, ok: true, state: 'ready', snapshot }, now());
+        if (next) renderSnapshot(next, receptionFailed); else expire();
+    };
+    if (capture) {
+      const at = now(), deadlines = [];
+      if (state !== 'stale' && snapshot.readAt + MYABACUS_READ_STALE_MS > at) deadlines.push(snapshot.readAt + MYABACUS_READ_STALE_MS);
+      if (snapshot.sourceDate === myAbacusZurichDate(at)) {
+        const nextDay = myAbacusNextDateChange(at); if (nextDay !== null) deadlines.push(nextDay);
+      }
+      if (deadlines.length) staleTimer = win.setTimeout(repaint, Math.max(0, Math.min(...deadlines) - at));
+    } else {
+      expiryTimer = win.setTimeout(expire, Math.max(0, myAbacusExpiry(snapshot, now()) - now()));
+      if (state !== 'stale') staleTimer = win.setTimeout(repaint, Math.max(0, snapshot.readAt + MYABACUS_READ_STALE_MS - now()));
     }
+  }
+  function keepLastGood() {
+    if (!lastGood) return false;
+    const result = normalizeMyAbacusResult({ ...lastGood, ok: true, state: 'ready' }, now());
+    if (!result) return false;
+    renderSnapshot(result, true); return true;
   }
   function requestSnapshot(type) {
     let settle, timer = null, finished = false;
@@ -144,9 +164,10 @@ export function initializeMyAbacus(options = {}) {
     active.promise = request.promise.then(outcome => {
       if (disposed || version !== generation || outcome.kind === 'cancelled') return;
       if (!hasOwner()) { stopCapture(); invalidate(); stopPolling(); empty('disconnected', 'Connectez Microsoft'); return; }
-      if (outcome.kind === 'timeout') { empty('unavailable', 'Extension à installer'); return; }
+      if (outcome.kind === 'timeout') { if (!keepLastGood()) empty('unavailable', 'Extension à installer'); return; }
       const result = normalizeMyAbacusResult(outcome.result, now());
-      if (!result || result.state === 'empty') { renderEmpty(result); return; }
+      if (!result) { if (!keepLastGood()) renderEmpty(null); return; }
+      if (result.state === 'empty') { renderEmpty(result); return; }
       renderSnapshot(result);
     }).finally(() => {
       if (pending === active) { pending = null; updateControls(); }
@@ -187,7 +208,7 @@ export function initializeMyAbacus(options = {}) {
   });
   function dispose() {
     if (disposed) return;
-    disposed = true; invalidate(); stopPolling(); clearDisplayTimers(); displayed = null;
+    disposed = true; invalidate(); stopPolling(); clearDisplayTimers(); displayed = null; lastGood = null;
     unsubscribeOut?.(); unsubscribeIn?.();
     open?.removeEventListener('click', showSetup); close?.removeEventListener('click', hideSetup);
     refreshButton?.removeEventListener('click', forceClick);
