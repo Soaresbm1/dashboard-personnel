@@ -59,13 +59,9 @@
           <dt>Prochain rendez-vous</dt>
           <dd><span id="summary-agenda-value" class="summary-value">—</span><span id="summary-agenda-detail" class="summary-detail">Chargement de l’agenda…</span></dd>
         </div>
-        <div id="summary-tasks" class="summary-item">
-          <dt>Tâches en retard</dt>
-          <dd><span id="summary-tasks-value" class="summary-value">—</span><span id="summary-tasks-detail" class="summary-detail">Chargement de l’intranet…</span></dd>
-        </div>
-        <div id="summary-tickets" class="summary-item">
-          <dt>Tickets prioritaires</dt>
-          <dd><span id="summary-tickets-value" class="summary-value">—</span><span id="summary-tickets-detail" class="summary-detail">Chargement de l’intranet…</span></dd>
+        <div id="summary-transport" class="summary-item transport-summary" data-state="loading">
+          <dt class="transport-summary-heading"><span>Départs · Vauseyon</span><span class="transport-summary-links"><a href="https://opentransportdata.swiss/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" aria-label="Source des départs : opentransportdata.swiss">Source</a><button id="transport-open" type="button" aria-haspopup="dialog" aria-controls="transport-setup">Tous les départs</button></span></dt>
+          <dd><p id="transport-inline-status" class="sr-only" role="status" aria-live="polite">Chargement des départs de Neuchâtel, Vauseyon…</p><ol id="transport-inline-items" class="transport-inline-items" aria-label="Prochains départs de Neuchâtel, Vauseyon" aria-busy="false"><li class="transport-inline-empty">Chargement des prochains bus…</li></ol></dd>
         </div>
         <div id="summary-weather" class="summary-item weather-summary" data-state="loading">
           <dt><span>Météo · Neuchâtel</span><a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" class="weather-source" aria-label="Source météo : Open-Meteo">Open-Meteo</a></dt>
@@ -81,7 +77,6 @@
         <span id="workplace-tools" class="workplace-tools">
           <button id="directory-open" type="button" aria-haspopup="dialog" aria-controls="directory-setup">Annuaire</button>
           <button id="rooms-open" type="button" aria-haspopup="dialog" aria-controls="rooms-setup">Salles <span id="rooms-summary" class="tool-summary">—</span></button>
-          <button id="transport-open" type="button" aria-haspopup="dialog" aria-controls="transport-setup" title="Prochains départs de Neuchâtel, Vauseyon">Transports <span id="transport-summary" class="tool-summary">—</span></button>
         </span>
       </nav>
       <div class="overview-grid">
