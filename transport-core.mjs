@@ -1,7 +1,8 @@
-export const TRANSPORT_STOP = Object.freeze({ id: '8504260', name: 'Neuchâtel, Vauseyon', timezone: 'Europe/Zurich' });
+export const TRANSPORT_STOP = Object.freeze({ id: '8593564', name: 'Neuchâtel, Pont des Parcs', timezone: 'Europe/Zurich' });
+export const TRANSPORT_DESTINATION = Object.freeze({ id: '8579625', name: 'Neuchâtel, gare nord' });
 export const TRANSPORT_INTERVAL_MS = 60_000;
 export const TRANSPORT_MAX_AGE_MS = 3 * 60_000;
-export const TRANSPORT_URL = 'https://transport.opendata.ch/v1/stationboard?id=8504260&limit=10&fields[]=station&fields[]=stationboard/stop&fields[]=stationboard/name&fields[]=stationboard/category&fields[]=stationboard/number&fields[]=stationboard/to';
+export const TRANSPORT_URL = 'https://transport.opendata.ch/v1/stationboard?id=8593564&limit=30&fields[]=station&fields[]=stationboard/stop&fields[]=stationboard/name&fields[]=stationboard/category&fields[]=stationboard/number&fields[]=stationboard/to';
 
 const timeFormat = new Intl.DateTimeFormat('fr-CH', { timeZone: TRANSPORT_STOP.timezone, hour: '2-digit', minute: '2-digit' });
 const dateFormat = new Intl.DateTimeFormat('en-CA', { timeZone: TRANSPORT_STOP.timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -13,6 +14,8 @@ export function transportRetryAt(value, now = Date.now()) {
   return Math.min(now + 24 * 60 * 60_000, Math.max(now + 60_000, Number.isFinite(requested) ? requested : now + 120_000));
 }
 const text = (value, limit) => typeof value === 'string' ? value.trim().slice(0, limit) : '';
+const directionKey = value => value.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase('fr').replace(/[,\s]+/g, '');
+export const matchesTransportDirection = destination => typeof destination === 'string' && directionKey(destination) === directionKey(TRANSPORT_DESTINATION.name);
 const timestamp = value => {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:?\d{2})$/.test(value)) return NaN;
   return Date.parse(value);
@@ -40,7 +43,9 @@ export function parseStationboard(payload) {
   }
   // A nonempty response with no usable rows is malformed, not an empty service.
   if (payload.stationboard.length && !departures.length) throw new Error('invalid_departures');
-  return departures.sort((a, b) => a.expectedAt - b.expectedAt || a.plannedAt - b.plannedAt);
+  // Validate the response before filtering: opposite-direction services form a valid empty result.
+  return departures.filter(item => matchesTransportDirection(item.destination))
+    .sort((a, b) => a.expectedAt - b.expectedAt || a.plannedAt - b.plannedAt);
 }
 
 export function upcomingDepartures(departures, now = Date.now(), limit = 6) {

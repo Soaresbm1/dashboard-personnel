@@ -1,5 +1,5 @@
 import { createAutoRefresh } from './auto-refresh.mjs';
-import { TRANSPORT_URL, TRANSPORT_STOP, TRANSPORT_INTERVAL_MS, TRANSPORT_MAX_AGE_MS, parseStationboard, upcomingDepartures, departureCountdown, transportTime, transportRetryAt } from './transport-core.mjs';
+import { TRANSPORT_URL, TRANSPORT_STOP, TRANSPORT_DESTINATION, TRANSPORT_INTERVAL_MS, TRANSPORT_MAX_AGE_MS, parseStationboard, upcomingDepartures, departureCountdown, transportTime, transportRetryAt } from './transport-core.mjs';
 
 const get = id => document.getElementById(id);
 const dialog = get('transport-setup'), list = get('transport-items'), openButton = get('transport-open');
@@ -19,7 +19,7 @@ function renderInline(current, { state, stale, usable, status, now }) {
   notice.className = stale ? 'transport-inline-notice' : 'sr-only';
   if (notice.textContent !== status) notice.textContent = status;
   if (!usable || !current.length) {
-    inlineList.replaceChildren(make('li', 'transport-inline-empty', !usable ? (state === 'loading' ? 'Chargement des prochains bus…' : 'Horaires indisponibles · nouvelle tentative automatique') : 'Aucun prochain départ dans les horaires reçus.'));
+    inlineList.replaceChildren(make('li', 'transport-inline-empty', !usable ? (state === 'loading' ? 'Chargement des prochains bus…' : 'Horaires indisponibles · nouvelle tentative automatique') : 'Aucun départ vers la gare nord dans les horaires reçus.'));
     return;
   }
   const rows = current.slice(0, 3).map(item => {
@@ -46,7 +46,7 @@ function render() {
   const current = usable ? upcomingDepartures(departures, now) : [];
   dialog.dataset.state = usable ? (stale ? 'stale' : 'ready') : (inFlight && !failed ? 'loading' : 'unavailable');
   get('transport-status').dataset.state = dialog.dataset.state;
-  openButton.title = current.length && !stale ? `${TRANSPORT_STOP.name} · ${current[0].line} → ${current[0].destination} · ${transportTime(current[0].expectedAt)}` : `Prochains départs de ${TRANSPORT_STOP.name}`;
+  openButton.title = current.length && !stale ? `${TRANSPORT_STOP.name} · ${current[0].line} → ${current[0].destination} · ${transportTime(current[0].expectedAt)}` : `Départs de ${TRANSPORT_STOP.name} vers ${TRANSPORT_DESTINATION.name}`;
   const status = !usable ? (inFlight && !failed ? 'Chargement des départs…' : 'Horaires indisponibles. Nouvelle tentative automatique.')
     : stale ? `Actualisation impossible. Derniers horaires reçus à ${transportTime(checkedAt)}.`
     : `${current.length} prochain${current.length === 1 ? '' : 's'} départ${current.length === 1 ? '' : 's'} · prévisions lorsqu’elles sont disponibles`;
@@ -54,7 +54,7 @@ function render() {
   get('transport-last-updated').textContent = usable ? `Actualisé à ${transportTime(checkedAt)}` : '';
   renderInline(current, { state: dialog.dataset.state, stale, usable, status, now });
   if (!usable || !current.length) {
-    list.replaceChildren(make('p', 'workplace-empty', !usable ? (inFlight && !failed ? 'Chargement des prochains bus…' : 'Les départs seront affichés dès que les horaires seront disponibles.') : 'Aucun prochain départ dans les horaires reçus.'));
+    list.replaceChildren(make('p', 'workplace-empty', !usable ? (inFlight && !failed ? 'Chargement des prochains bus…' : 'Les départs seront affichés dès que les horaires seront disponibles.') : 'Aucun départ vers la gare nord dans les horaires reçus.'));
     return;
   }
   const rows = current.map(item => {
