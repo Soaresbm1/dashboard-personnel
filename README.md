@@ -92,6 +92,14 @@ Le panneau « Tâches et tickets » lit les éléments attribués au compte conn
 
 La connexion Microsoft est partagée avec Outlook et mémorisée dans ce navigateur. Les tâches et tickets restent en mémoire, hors du cache d’authentification et des exports. Une annulation de connexion ou une erreur de récupération intranet n’efface pas le cache Outlook. Le module refuse les redirections réseau et ne transmet son jeton qu’à l’adresse API fixe ci-dessus. L’accès est refusé par défaut tant que l’API n’est pas activée et correctement configurée.
 
+## Météo locale
+
+Le résumé affiche les conditions prévues actuellement à **Neuchâtel, Suisse** : température en °C, conditions et minimum/maximum du jour dans le fuseau `Europe/Zurich`. La météo utilise [Open-Meteo](https://open-meteo.com/), dont le lien d’attribution figure près des données, avec les coordonnées fixes `46.99179, 6.93100`. Aucune géolocalisation, clé API ou permission Microsoft n’est nécessaire. Seule la requête météo publique est envoyée au fournisseur, sans identifiant ni jeton du dashboard.
+
+Le chargement se fait à l’ouverture, puis toutes les 15 minutes lorsque la page est visible et en ligne. Le retour à la page ou au réseau rattrape une actualisation échue. Le délai réseau est limité à 12 secondes. Une panne conserve le dernier relevé récent avec une indication explicite ; au-delà d’une heure de validité ou au changement de jour local, le relevé est retiré. Les valeurs nulles ou les unités inattendues ne sont jamais présentées comme une température de zéro. Les données restent en mémoire uniquement.
+
+Documentation : [API et codes météo](https://open-meteo.com/en/docs), [conditions d’utilisation personnelle et attribution](https://open-meteo.com/en/terms).
+
 ## Publication avec GitHub Pages
 
 Les fichiers du site sont à la racine du dépôt. Dans **Settings → Pages**, choisissez **Deploy from a branch**, puis la branche **main** et le dossier **/ (root)**. Aucun build ni dépendance n’est nécessaire.
