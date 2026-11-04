@@ -20,14 +20,17 @@ export function initializeNotifications({ document: doc = globalThis.document, w
     get('notifications-summary').textContent = snapshot.items.length ? `${count} non vue${count === 1 ? '' : 's'} · ${snapshot.items.length} notification${snapshot.items.length === 1 ? '' : 's'}` : 'Aucune notification pour le moment';
     get('notifications-mark-all').disabled = count === 0;
     const unavailable = Object.values(snapshot.sources).some(source => source.stale);
-    get('notifications-note').textContent = `${unavailable ? 'Une source ne peut pas être actualisée. ' : ''}${snapshot.limited ? 'Aperçu limité aux dernières notifications. ' : ''}Les mails non lus chargés et les nouveautés détectées depuis l’ouverture de cette page.`;
-    const nextSignature = JSON.stringify(snapshot.items);
+    const ready = Object.values(snapshot.sources).filter(source => source.ready).length;
+    const availability = ready === 3 ? 'Mails, tâches/tickets et actualités suivis. ' : ready ? 'Certaines sources ne sont pas encore disponibles. ' : 'Les sources Microsoft ne sont pas encore connectées. ';
+    get('notifications-note').textContent = `${availability}${unavailable ? 'Une source ne peut pas être actualisée. ' : ''}${snapshot.limited ? 'Aperçu limité aux dernières notifications. ' : ''}Les mails non lus chargés et les nouveautés détectées depuis l’ouverture de cette page.`;
+    const nextSignature = JSON.stringify({ items: snapshot.items, sources: snapshot.sources });
     if (signature === nextSignature) return;
     signature = nextSignature;
     const active = doc.activeElement, focusedId = active?.dataset?.notificationId, focusedAction = active?.dataset?.notificationAction;
     const focusedControls = new Map();
     if (!snapshot.items.length) {
-      const empty = make('p', 'notifications-empty', 'Vous êtes à jour. Les nouveaux mails, changements de tâches ou tickets et publications apparaîtront ici.');
+      const empty = make('p', 'notifications-empty', ready === 3 ? 'Aucune nouveauté détectée. Les nouveaux mails, changements de tâches ou tickets et publications apparaîtront ici.'
+        : ready ? 'Les nouveautés des services connectés apparaîtront ici.' : 'Utilisez Connexions pour connecter les services Microsoft et suivre vos nouveautés.');
       list.replaceChildren(empty);
       if (dialog.open && focusedId) close.focus();
       return;
