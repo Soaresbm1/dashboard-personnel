@@ -137,6 +137,10 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .summary-item dd { margin: 0; }
 .summary-value { display: block; margin-top: 3px; font-size: 22px; font-weight: 600; letter-spacing: -.5px; line-height: 1.2; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .summary-detail { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.summary-appointment { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 10px; }
+.teams-join { display: inline-flex; align-items: center; justify-content: center; min-height: 24px; padding: 2px 7px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); font-size: 10px; font-weight: 500; line-height: 1.4; text-decoration: none; white-space: nowrap; }
+.teams-join:hover { background: #f3f3f0; }
+.outlook-event-join { display: flex; width: fit-content; margin-top: 4px; }
 .summary-item[data-state="unavailable"] .summary-value, .summary-item[data-state="loading"] .summary-value { color: var(--muted); }
 .transport-summary { grid-column: span 2; }
 .transport-summary-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 2px 10px; }
