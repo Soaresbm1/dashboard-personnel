@@ -1,4 +1,4 @@
-import { localDateKey, eventOverlapsDay } from './outlook-core.mjs';
+import { localDateKey, eventOverlapsDay, teamsJoinUrlForEvent } from './outlook-core.mjs';
 import { summarizeIntranetWork } from './intranet-core.mjs';
 
 // Snapshots belong to this page only; no storage, network or authentication.
@@ -15,14 +15,14 @@ export function summarizeAgenda(events, window, now = new Date()) {
     .sort((a, b) => rank(a) - rank(b) || a.start - b.start
       || Number(a.isAllDay) - Number(b.isAllDay) || a.title.localeCompare(b.title, 'fr'));
   const event = candidates[0];
-  if (!event) return { value: 'Aucun à venir', detail: period };
+  if (!event) return { value: 'Aucun à venir', detail: period, joinUrl: null };
   const day = localDateKey(event.start) === localDateKey(now) ? 'Aujourd’hui'
     : new Intl.DateTimeFormat('fr-CH', { weekday: 'short', day: 'numeric', month: 'short' }).format(event.start);
   const current = event.start <= now && event.end > now;
   const value = event.isAllDay ? 'Toute la journée' : current ? 'En cours' : time(event.start);
   const endDay = localDateKey(event.end) === localDateKey(now) ? '' : `${new Intl.DateTimeFormat('fr-CH', { weekday: 'short', day: 'numeric', month: 'short' }).format(event.end)} `;
   const timing = event.isAllDay ? day : current ? `Jusqu’à ${endDay}${time(event.end)}` : day;
-  return { value, detail: `${timing} · ${event.isPrivate ? 'Événement privé' : event.title}` };
+  return { value, detail: `${timing} · ${event.isPrivate ? 'Événement privé' : event.title}`, joinUrl: teamsJoinUrlForEvent(event, now) };
 }
 
 function pageSnapshots(doc) {
@@ -42,10 +42,13 @@ function writeSummary(doc, kind, value, detail, status) {
 export function renderDashboardSummary(doc = globalThis.document, now = new Date()) {
   if (!doc) return;
   const { agenda, work } = pageSnapshots(doc);
+  const join = doc.querySelector('#summary-agenda-join');
+  if (join) { join.hidden = true; join.removeAttribute('href'); }
   if (available(agenda)) {
     const summary = summarizeAgenda(agenda.events, agenda.window, now);
     writeSummary(doc, 'agenda', agenda.limited && summary.value === 'Aucun à venir' ? 'Aucun dans l’aperçu' : summary.value,
       `${agenda.status === 'stale' ? 'Dernières données · ' : ''}${agenda.limited ? 'Aperçu limité · ' : ''}${summary.detail}`, agenda.status);
+    if (join && summary.joinUrl) { join.href = summary.joinUrl; join.hidden = false; }
   } else writeSummary(doc, 'agenda', '—', agenda.status === 'loading' ? 'Chargement de l’agenda…' : 'Agenda non disponible', agenda.status);
   if (available(work) && work.work) {
     const summary = summarizeIntranetWork(work.work, now);

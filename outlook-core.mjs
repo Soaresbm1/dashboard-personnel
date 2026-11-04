@@ -27,7 +27,7 @@ export function calendarRequestUrl(window) {
   const url = new URL('https://graph.microsoft.com/v1.0/me/calendarView');
   url.searchParams.set('startDateTime', window.start.toISOString());
   url.searchParams.set('endDateTime', window.end.toISOString());
-  url.searchParams.set('$select', 'id,subject,start,end,isAllDay,isCancelled,location,webLink,sensitivity');
+  url.searchParams.set('$select', 'id,subject,start,end,isAllDay,isCancelled,location,webLink,sensitivity,onlineMeeting');
   url.searchParams.set('$orderby', 'start/dateTime');
   url.searchParams.set('$top', '100');
   return url.href;
@@ -48,6 +48,21 @@ export function safeOutlookEventUrl(value) {
     const hosts = ['outlook.office.com', 'outlook.office365.com', 'outlook.live.com'];
     return url.protocol === 'https:' && (!url.port || url.port === '443') && hosts.includes(url.hostname) && !url.username && !url.password ? url.href : null;
   } catch { return null; }
+}
+
+export function safeTeamsJoinUrl(value) {
+  if (typeof value !== 'string' || value.length > 8192 || /[\u0000-\u0020\u007f]/.test(value)) return null;
+  try {
+    const url = new URL(value);
+    const hosts = ['teams.microsoft.com', 'teams.cloud.microsoft', 'teams.live.com'];
+    return url.protocol === 'https:' && !url.port && hosts.includes(url.hostname) && !url.username && !url.password ? url.href : null;
+  } catch { return null; }
+}
+
+export function teamsJoinUrlForEvent(event, now = new Date()) {
+  if (!event || event.isPrivate || !(event.start instanceof Date) || !(event.end instanceof Date)
+    || !(event.end > now || (+event.start === +event.end && event.start >= now))) return null;
+  return safeTeamsJoinUrl(event.joinUrl);
 }
 
 export function graphDateTime(value) {
@@ -76,7 +91,8 @@ export function normalizeCalendarEvents(values) {
     const isPrivate = ['private', 'confidential'].includes(value.sensitivity);
     const title = isPrivate ? 'Événement privé' : (typeof value.subject === 'string' ? value.subject.trim().slice(0, 300) : '') || 'Sans titre';
     const location = !isPrivate && typeof value.location?.displayName === 'string' ? value.location.displayName.trim().slice(0, 250) : '';
-    events.push({ id, title, location, start, end, isAllDay: !!value.isAllDay, isPrivate, url: safeOutlookEventUrl(value.webLink) });
+    events.push({ id, title, location, start, end, isAllDay: !!value.isAllDay, isPrivate, url: safeOutlookEventUrl(value.webLink),
+      joinUrl: isPrivate ? null : safeTeamsJoinUrl(value.onlineMeeting?.joinUrl) });
   }
   return events.sort((a, b) => a.start - b.start || Number(b.isAllDay) - Number(a.isAllDay) || a.title.localeCompare(b.title, 'fr'));
 }

@@ -1,7 +1,7 @@
 import {
   OUTLOOK_CONFIG_KEY, OUTLOOK_SCOPES, normalizeOutlookConfig,
   calendarWindow, calendarRequestUrl, safeGraphPage, normalizeCalendarEvents,
-  groupCalendarEvents, eventTimeLabel, retryAfterMilliseconds
+  groupCalendarEvents, eventTimeLabel, retryAfterMilliseconds, teamsJoinUrlForEvent
 } from './outlook-core.mjs';
 import { MICROSOFT_DEPLOYMENT, getMicrosoftClient, getRememberedMicrosoftAccount, isDashboardMicrosoftAccount,
   rememberMicrosoftAccount, clearMicrosoftSession, subscribeMicrosoftSignOut, subscribeMicrosoftSignIn } from './microsoft-session.mjs';
@@ -224,6 +224,13 @@ export function initializeOutlookAgenda(options = {}) {
         if (event.url) { title.href = event.url; title.target = '_blank'; title.rel = 'noopener noreferrer'; title.referrerPolicy = 'no-referrer'; title.setAttribute('aria-label', `${event.title} — ouvrir dans Outlook`); }
         details.append(title);
         if (event.location) { const location = doc.createElement('small'); location.className = 'outlook-event-location'; location.textContent = event.location; details.append(location); }
+        const joinUrl = teamsJoinUrlForEvent(event, now());
+        if (joinUrl) {
+          const join = doc.createElement('a'); join.className = 'teams-join outlook-event-join'; join.textContent = 'Rejoindre Teams';
+          join.href = joinUrl; join.target = '_blank'; join.rel = 'noopener noreferrer'; join.referrerPolicy = 'no-referrer';
+          join.setAttribute('aria-label', `Rejoindre ${event.title} dans Teams (nouvel onglet)`);
+          details.append(join);
+        }
         row.append(time, details); section.append(row);
       }
       fragment.append(section);
@@ -276,7 +283,7 @@ export function initializeOutlookAgenda(options = {}) {
       }
       const events = normalizeCalendarEvents(values).filter(event => event.start < window.end && (event.end > window.start || event.start.getTime() === event.end.getTime() && event.start >= window.start));
       if (generation !== requestGeneration) return;
-      const currentTime = now(), signature = JSON.stringify({ start: window.start, end: window.end, localDay: [currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate()], events: events.map(event => [event.id, event.title, event.start, event.end, event.location, event.url, event.isAllDay, event.isPrivate, event.start <= currentTime && event.end > currentTime]) });
+      const currentTime = now(), signature = JSON.stringify({ start: window.start, end: window.end, localDay: [currentTime.getFullYear(), currentTime.getMonth(), currentTime.getDate()], events: events.map(event => [event.id, event.title, event.start, event.end, event.location, event.url, teamsJoinUrlForEvent(event, currentTime), event.isAllDay, event.isPrivate, event.start <= currentTime && event.end > currentTime]) });
       if (!preserveSnapshot || lastGood.signature !== signature) renderEvents(events, window);
       lastGood = { account: signedInAccount, range: selectedRange, at: currentTime, signature, events, window, limited };
       accessBlocked = false;
