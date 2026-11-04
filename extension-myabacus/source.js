@@ -40,7 +40,9 @@
       const result = reader.parse(reader.collect(document)), now = Date.now();
       if (result.state !== 'ready') {
         candidate = ''; candidateAt = 0;
-        const reason = ['account', 'context', 'date', 'layout', 'number'].includes(result.reason) ? result.reason : 'exception';
+        let reason = ['account', 'context', 'date', 'layout', 'number'].includes(result.reason) ? result.reason : 'exception';
+        // A missing avatar during loading is not proof of another account.
+        if (reason === 'account' && reader.personalNavigation(document).reason !== 'account') reason = 'exception';
         if (invalidReason !== reason) { invalidReason = reason; firstInvalid = now; }
         // Allow hydration to finish before classifying an incomplete initial frame.
         if (now - firstInvalid >= 12000) await failure(reason);

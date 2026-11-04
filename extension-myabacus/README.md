@@ -1,6 +1,6 @@
 # Dashboard · MyAbacus local (Edge)
 
-Extension personnelle Manifest V3, version **1.1.0**. Pendant que le dashboard est ouvert et connecté, elle ouvre une page MyAbacus temporaire en arrière-plan environ toutes les **10 minutes**, consulte la vue personnelle In & Out puis referme uniquement l’onglet qu’elle a créé. Aucun accès Q910/Q981 ni API Abacus n’est nécessaire.
+Extension personnelle Manifest V3, version **1.1.1**. Pendant que le dashboard est ouvert et connecté, elle ouvre une page MyAbacus temporaire en arrière-plan environ toutes les **10 minutes**, consulte la vue personnelle In & Out puis referme uniquement l’onglet qu’elle a créé. Aucun accès Q910/Q981 ni API Abacus n’est nécessaire.
 
 ## Installation
 
@@ -21,7 +21,7 @@ Une éventuelle politique d’entreprise interdisant les extensions non empaquet
 - Vacances disponibles **après la planification au 31 décembre**, en jours ; cette valeur reste distincte du solde courant.
 - Date affichée par MyAbacus et date de lecture locale.
 
-La date « Lu à » correspond à l’acquisition de valeurs stables dans la nouvelle page temporaire. Une simple consultation du cache ne rajeunit pas cette date. Les compteurs restent consultables pendant **15 minutes au maximum**, jusqu’au prochain changement de jour en Suisse, ou jusqu’à la déconnexion Microsoft. Une panne conserve uniquement un relevé encore valide avec une indication de lecture ancienne ; une valeur manquante n’est jamais remplacée par zéro. La nouvelle page demande les informations au portail, mais l’extension ne reconstitue pas les soldes et ne garantit pas le calendrier de calcul du serveur Abacus.
+La date « Lu à » correspond à l’acquisition de valeurs stables dans la nouvelle page temporaire. Une simple consultation du cache ne rajeunit pas cette date. **Si une récupération échoue, les dernières valeurs restent disponibles pendant la session du navigateur**, y compris après quinze minutes ou un changement de jour. Elles sont signalées comme anciennes dès un échec, après quinze minutes sans nouvelle lecture ou lorsque leur date est antérieure à aujourd’hui. Leurs dates et heures d’origine restent affichées ; aucune valeur absente n’est remplacée par zéro. La nouvelle page demande les informations au portail, mais l’extension ne reconstitue pas les soldes et ne garantit pas le calendrier de calcul du serveur Abacus.
 
 Edge doit rester ouvert. Aucun nouveau passage n’est lancé lorsque le dashboard est fermé. Une lecture déjà commencée peut finir, avec un délai limite de **60 secondes**. La veille du PC et la suspension des onglets peuvent retarder les passages ; le retour au dashboard rattrape une tentative échue. Les alarmes ne servent qu’au nettoyage, jamais à lire MyAbacus lorsque le dashboard est fermé.
 
@@ -35,7 +35,7 @@ L’onglet temporaire suit uniquement le lien personnel In & Out du menu du comp
 
 Le worker reçoit seulement les trois valeurs numériques, la date source, la version du schéma et des messages de contrôle bornés. Il vérifie l’origine, le chemin, l’identifiant de l’extension, la fenêtre principale, l’onglet et le document de chaque message. Les captures sont acceptées uniquement de son onglet temporaire. Les données et les métadonnées de traitement restent dans `chrome.storage.session` privé aux contextes de l’extension : mémoire du profil, effacée au redémarrage du navigateur ou rechargement/désactivation de l’extension. Aucune utilisation de storage.local/sync, localStorage ou IndexedDB pour les soldes.
 
-La fermeture du nouvel onglet après acquittement conserve la capture jusqu’à son expiration. Le dashboard possède aussi son propre minuteur d’expiration. La déconnexion Microsoft efface immédiatement l’affichage et demande au worker de purger le cache et d’arrêter le traitement courant. Elle ne déconnecte pas MyAbacus. Une session expirée, un contexte ambigu ou un chargement trop long affiche un état à vérifier et ne déclenche aucune saisie d’identifiants automatique.
+La fermeture du nouvel onglet après acquittement conserve la dernière capture. La page garde également sa dernière réception valide lorsqu’un message de l’extension est absent ou invalide. Une réponse explicite de cache vide, la déconnexion Microsoft ou la confirmation d’un autre compte MyAbacus efface ces données. Un avatar simplement absent pendant un chargement ne prouve pas un changement de compte. Le redémarrage du navigateur ou le rechargement de l’extension vide toujours son stockage de session. Aucune saisie d’identifiants n’est automatisée.
 
 L’extension transmet ses réponses uniquement au chemin autorisé du dashboard dans ce profil. Le contrôle du compte Microsoft dans le front évite un affichage accidentel ; il ne constitue pas une authentification Entra du worker. Un script exécuté sur la page autorisée a accès aux valeurs qu’elle affiche. Cette intégration locale ne remplace pas une API serveur protégeant des données partagées.
 
