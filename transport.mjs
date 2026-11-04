@@ -12,6 +12,8 @@ const make = (tag, className, content) => {
   if (content !== undefined) element.textContent = content;
   return element;
 };
+const arrivalDescription = item => item.arrivalAt === null ? 'Arrivée à la gare nord indisponible'
+  : `Arrivée ${item.hasArrivalPrediction ? 'estimée' : 'prévue'} à la gare nord à ${transportTime(item.arrivalAt)}`;
 
 function renderInline(current, { state, stale, usable, status, now }) {
   inlineSummary.dataset.state = state;
@@ -30,9 +32,16 @@ function renderInline(current, { state, stale, usable, status, now }) {
     const departure = make('time', '', transportTime(item.expectedAt));
     departure.dateTime = new Date(item.expectedAt).toISOString();
     const kind = item.hasPrediction ? 'Prévision' : item.delay !== null && item.delay !== 0 ? 'Horaire ajusté' : 'Horaire prévu';
-    row.title = `${item.line} → ${item.destination} · ${kind} ${transportTime(item.expectedAt)} · départ prévu ${transportTime(item.plannedAt)}${item.delay > 0 ? ` · retard ${item.delay} min` : ''}`;
+    departure.setAttribute('aria-label', `${kind} de départ à ${transportTime(item.expectedAt)}`);
+    const arrival = make(item.arrivalAt === null ? 'span' : 'time', 'transport-inline-arrival', item.arrivalAt === null ? '—' : transportTime(item.arrivalAt));
+    if (item.arrivalAt !== null) arrival.dateTime = new Date(item.arrivalAt).toISOString();
+    arrival.title = arrivalDescription(item);
+    arrival.setAttribute('aria-label', arrival.title);
+    const arrow = make('span', 'transport-inline-arrow', '→');
+    arrow.setAttribute('aria-hidden', 'true');
+    row.title = `${item.line} → ${item.destination} · ${kind} ${transportTime(item.expectedAt)} · départ prévu ${transportTime(item.plannedAt)}${item.delay > 0 ? ` · retard ${item.delay} min` : ''} · ${arrivalDescription(item)}`;
     if (item.delay > 0) destination.append(make('span', 'transport-inline-delay', `+${item.delay} min`));
-    timing.append(departure, make('span', 'transport-inline-countdown', stale ? 'Reçu' : departureCountdown(item, now)));
+    timing.append(departure, arrow, arrival, make('span', 'transport-inline-countdown', stale ? 'Reçu' : departureCountdown(item, now)));
     row.append(make('span', 'transport-inline-line', item.line), destination, timing);
     return row;
   });
@@ -64,6 +73,9 @@ function render() {
     const timing = item.hasPrediction ? 'Prévision' : item.delay !== null && item.delay !== 0 ? 'Horaire ajusté' : 'Horaire prévu';
     const delay = item.delay > 0 ? ` · +${item.delay} min` : '';
     body.append(make('p', '', `${timing} · ${transportTime(item.expectedAt)}${delay}${item.platform ? ` · Quai ${item.platform}` : ''}`));
+    const arrival = make('p', 'transport-arrival', arrivalDescription(item));
+    if (item.hasArrivalPrediction && item.plannedArrivalAt !== null) arrival.title = `Arrivée à l’horaire : ${transportTime(item.plannedArrivalAt)}`;
+    body.append(arrival);
     const right = make('div', 'transport-time', stale ? 'Dernier horaire' : departureCountdown(item, now));
     const planned = make('time', '', `${transportTime(item.plannedAt)} prévu`);
     planned.dateTime = new Date(item.plannedAt).toISOString();

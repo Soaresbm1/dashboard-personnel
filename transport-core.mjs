@@ -2,7 +2,7 @@ export const TRANSPORT_STOP = Object.freeze({ id: '8593564', name: 'Neuchâtel, 
 export const TRANSPORT_DESTINATION = Object.freeze({ id: '8579625', name: 'Neuchâtel, gare nord' });
 export const TRANSPORT_INTERVAL_MS = 60_000;
 export const TRANSPORT_MAX_AGE_MS = 3 * 60_000;
-export const TRANSPORT_URL = 'https://transport.opendata.ch/v1/stationboard?id=8593564&limit=30&fields[]=station&fields[]=stationboard/stop&fields[]=stationboard/name&fields[]=stationboard/category&fields[]=stationboard/number&fields[]=stationboard/to';
+export const TRANSPORT_URL = 'https://transport.opendata.ch/v1/stationboard?id=8593564&limit=30&fields[]=station&fields[]=stationboard/stop&fields[]=stationboard/name&fields[]=stationboard/category&fields[]=stationboard/number&fields[]=stationboard/to&fields[]=stationboard/passList/station/id&fields[]=stationboard/passList/arrival&fields[]=stationboard/passList/arrivalTimestamp&fields[]=stationboard/passList/prognosis/arrival';
 
 const timeFormat = new Intl.DateTimeFormat('fr-CH', { timeZone: TRANSPORT_STOP.timezone, hour: '2-digit', minute: '2-digit' });
 const dateFormat = new Intl.DateTimeFormat('en-CA', { timeZone: TRANSPORT_STOP.timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -21,6 +21,25 @@ const timestamp = value => {
   return Date.parse(value);
 };
 
+function destinationArrival(passList, plannedDepartureAt, expectedDepartureAt) {
+  let result = { plannedArrivalAt: null, arrivalAt: null, hasArrivalPrediction: false };
+  if (!Array.isArray(passList)) return result;
+  for (const checkpoint of passList.slice(0, 100)) {
+    if (String(checkpoint?.station?.id) !== TRANSPORT_DESTINATION.id) continue;
+    const plannedArrivalAt = Number.isFinite(checkpoint.arrivalTimestamp) && checkpoint.arrivalTimestamp > 0
+      ? checkpoint.arrivalTimestamp * 1_000 : timestamp(checkpoint.arrival);
+    // The API can include a pseudo-stop carrying the destination ID but no actual arrival.
+    // Require a real scheduled arrival, then retain the last valid destination checkpoint.
+    if (!Number.isFinite(plannedArrivalAt) || plannedArrivalAt <= plannedDepartureAt || plannedArrivalAt - plannedDepartureAt > 6 * 60 * 60_000) continue;
+    const predicted = timestamp(checkpoint.prognosis?.arrival);
+    const hasArrivalPrediction = Number.isFinite(predicted) && predicted > expectedDepartureAt
+      && predicted - expectedDepartureAt <= 6 * 60 * 60_000 && Math.abs(predicted - plannedArrivalAt) <= 12 * 60 * 60_000;
+    const arrivalAt = hasArrivalPrediction ? predicted : plannedArrivalAt > expectedDepartureAt ? plannedArrivalAt : null;
+    result = { plannedArrivalAt, arrivalAt, hasArrivalPrediction };
+  }
+  return result;
+}
+
 export function parseStationboard(payload) {
   if (String(payload?.station?.id) !== TRANSPORT_STOP.id || !Array.isArray(payload?.stationboard) || payload?.errors?.length) throw new Error('invalid_stationboard');
   const seen = new Set(), departures = [];
@@ -38,6 +57,7 @@ export function parseStationboard(payload) {
     if (seen.has(key)) continue;
     seen.add(key);
     departures.push({ key, line, destination, plannedAt, expectedAt, hasPrediction,
+      ...destinationArrival(item.passList, plannedAt, expectedAt),
       delay: hasPrediction ? Math.round((expectedAt - plannedAt) / 60_000) : delay,
       platform: text(stop.prognosis?.platform, 32) || text(stop.platform, 32) });
   }
