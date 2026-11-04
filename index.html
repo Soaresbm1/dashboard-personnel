@@ -19,6 +19,7 @@
   <script src="transport.mjs" type="module"></script>
   <script src="notifications.mjs" type="module"></script>
   <script src="myabacus.mjs" type="module"></script>
+  <script src="github.mjs" type="module"></script>
 </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:none">
@@ -87,6 +88,19 @@
           <button id="rooms-open" type="button" aria-haspopup="dialog" aria-controls="rooms-setup">Salles <span id="rooms-summary" class="tool-summary">—</span></button>
         </span>
       </nav>
+      <section id="github-overview" class="github-strip" aria-labelledby="github-title" aria-busy="false">
+        <h2 id="github-title">GitHub</h2>
+        <article id="github-dashboard" class="github-project" aria-label="Suivi GitHub du dashboard">
+          <div class="github-project-line"><a class="github-project-name" href="https://github.com/Soaresbm1/dashboard-personnel" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Dashboard</a><a id="github-dashboard-deployment" class="github-deployment" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Chargement…</a></div>
+          <div class="github-project-line"><a id="github-dashboard-pulls" href="https://github.com/Soaresbm1/dashboard-personnel/pulls" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Modifications : —</a><span id="github-dashboard-checked" class="github-checked"></span></div>
+        </article>
+        <article id="github-intranet" class="github-project" aria-label="Suivi GitHub de l’intranet">
+          <div class="github-project-line"><a class="github-project-name" href="https://github.com/ISP-SPI/intranet-laravel" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Intranet</a><a id="github-intranet-deployment" class="github-deployment" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Chargement…</a></div>
+          <div class="github-project-line"><a id="github-intranet-pulls" href="https://github.com/ISP-SPI/intranet-laravel/pulls" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Modifications : —</a><span id="github-intranet-checked" class="github-checked"></span></div>
+        </article>
+        <button id="github-refresh" type="button" class="icon-button" aria-label="Actualiser le suivi GitHub" title="GitHub · actualisation automatique toutes les 5 minutes" hidden><svg class="icon" aria-hidden="true"><use href="#i-reset"/></svg></button>
+        <p id="github-status" class="sr-only" role="status" aria-live="polite">Préparation du suivi GitHub…</p>
+      </section>
       <div class="overview-grid">
         <section id="outlook-agenda" class="panel agenda-panel" aria-labelledby="outlook-title">
           <header class="panel-header">
@@ -149,7 +163,7 @@
           <footer class="panel-footer"><a href="https://intranet.isp-spi.ch/intranet" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir l’intranet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="news-last-updated"></span></footer>
         </section>
       </div>
-      <footer class="page-footer"><span>Actualisation automatique · services 1 min · météo 15 min</span><span>Consultation en lecture seule</span></footer>
+      <footer class="page-footer"><span>Actualisation automatique · services 1 min · GitHub 5 min · météo 15 min</span><span>Consultation en lecture seule</span></footer>
     </main>
   </div>
 
