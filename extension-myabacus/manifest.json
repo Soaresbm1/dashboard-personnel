@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Dashboard · MyAbacus local",
+  "version": "1.0.0",
+  "description": "Lecture locale des soldes personnels affichés dans MyAbacus, pour le dashboard de Bernardo.",
+  "minimum_chrome_version": "120",
+  "permissions": ["storage"],
+  "background": { "service_worker": "background.mjs", "type": "module" },
+  "action": { "default_title": "MyAbacus · lecture locale", "default_popup": "popup.html" },
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'none';" },
+  "content_scripts": [
+    {
+      "matches": ["https://abaprod.isp-spi.ch/portal/myabacus/*"],
+      "js": ["reader-core.js", "source.js"],
+      "run_at": "document_idle",
+      "all_frames": false,
+      "match_about_blank": false,
+      "match_origin_as_fallback": false,
+      "world": "ISOLATED"
+    },
+    {
+      "matches": ["https://soaresbm1.github.io/dashboard-personnel/", "https://soaresbm1.github.io/dashboard-personnel/index.html"],
+      "js": ["dashboard-bridge.js"],
+      "run_at": "document_idle",
+      "all_frames": false,
+      "match_about_blank": false,
+      "match_origin_as_fallback": false,
+      "world": "ISOLATED"
+    }
+  ]
+}
