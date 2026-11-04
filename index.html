@@ -16,6 +16,7 @@
   <script src="news.js" type="module"></script>
   <script src="workplace-tools.mjs" type="module"></script>
   <script src="weather.mjs" type="module"></script>
+  <script src="transport.mjs" type="module"></script>
 </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:none">
@@ -80,6 +81,7 @@
         <span id="workplace-tools" class="workplace-tools">
           <button id="directory-open" type="button" aria-haspopup="dialog" aria-controls="directory-setup">Annuaire</button>
           <button id="rooms-open" type="button" aria-haspopup="dialog" aria-controls="rooms-setup">Salles <span id="rooms-summary" class="tool-summary">—</span></button>
+          <button id="transport-open" type="button" aria-haspopup="dialog" aria-controls="transport-setup" title="Prochains départs de Neuchâtel, Vauseyon">Transports <span id="transport-summary" class="tool-summary">—</span></button>
         </span>
       </nav>
       <div class="overview-grid">
@@ -147,6 +149,15 @@
       <footer class="page-footer"><span>Actualisation automatique · services 1 min · météo 15 min</span><span>Consultation en lecture seule</span></footer>
     </main>
   </div>
+
+  <dialog id="transport-setup" class="modal workplace-dialog" aria-labelledby="transport-title" aria-describedby="transport-description">
+    <header class="modal-header"><div><h2 id="transport-title" tabindex="-1">Départs · Neuchâtel, Vauseyon</h2><p id="transport-description" class="workplace-description">Prochains bus · horaires et prévisions disponibles · actualisation chaque minute.</p></div><button id="transport-close" type="button" class="icon-button" aria-label="Fermer les transports"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></header>
+    <div class="workplace-body">
+      <p id="transport-status" class="service-status" role="status" aria-live="polite">Chargement des départs…</p>
+      <div id="transport-items" class="workplace-list transport-list" role="region" aria-label="Prochains départs de Vauseyon" tabindex="0" aria-busy="false"><p class="workplace-empty">Les prochains départs apparaîtront ici.</p></div>
+    </div>
+    <footer class="panel-footer"><a href="https://search.ch/horaire/Neuch%C3%A2tel,Vauseyon.fr.html" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Tous les horaires <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="transport-last-updated"></span><span class="transport-attribution">Données : <a href="https://opentransportdata.swiss/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">opentransportdata.swiss</a> · <a href="https://transport.opendata.ch/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">API Opendata.ch</a></span></footer>
+  </dialog>
 
   <dialog id="directory-setup" class="modal workplace-dialog" aria-labelledby="directory-title" aria-describedby="directory-description">
     <header class="modal-header"><div><h2 id="directory-title" tabindex="-1">Annuaire interne</h2><p id="directory-description" class="workplace-description">Retrouvez un collègue et ses coordonnées professionnelles.</p></div><button id="directory-close" type="button" class="icon-button" aria-label="Fermer l’annuaire"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></header>
