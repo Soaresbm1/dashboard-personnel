@@ -16,7 +16,10 @@ export function parseIntranetHealth(raw, now = Date.now()) {
       || (raw.outcome === 'redirect' && ![301, 302, 303, 307, 308].includes(status))
       || (raw.outcome === 'http_error' && ((status >= 200 && status < 300) || [301, 302, 303, 307, 308, 401, 403].includes(status)))) throw new Error('Invalid HTTP result');
   }
-  return { outcome: raw.outcome, httpStatus: status, error: raw.error, checkedAt, latencyMs: Math.round(raw.latencyMs) };
+  const hasApplicationCheck = raw.entryHttpStatus !== undefined || raw.applicationHttpStatus !== undefined;
+  if (hasApplicationCheck && (! [301, 302, 303, 307, 308].includes(raw.entryHttpStatus) || raw.applicationHttpStatus !== status || status === null)) throw new Error('Invalid application check');
+  return { outcome: raw.outcome, httpStatus: status, error: raw.error, checkedAt, latencyMs: Math.round(raw.latencyMs),
+    ...(hasApplicationCheck ? { entryHttpStatus: raw.entryHttpStatus, applicationHttpStatus: raw.applicationHttpStatus } : {}) };
 }
 export function intranetHealthView(sample, now = Date.now(), { feedUnavailable = false, offline = false } = {}) {
   if (offline) return { state: 'unknown', label: 'Vérification hors ligne' };
