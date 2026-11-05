@@ -17,7 +17,8 @@ export function initializeIntranetHealth(options = {}) {
     time.textContent = sample ? new Intl.DateTimeFormat('fr-CH', { hour: '2-digit', minute: '2-digit' }).format(new Date(sample.checkedAt)) : '';
     if (sample) time.dateTime = new Date(sample.checkedAt).toISOString(); else time.removeAttribute('datetime');
     const checked = sample ? ` Dernier contrôle : ${new Intl.DateTimeFormat('fr-CH', { dateStyle: 'short', timeStyle: 'medium' }).format(new Date(sample.checkedAt))}.` : '';
-    badge.title = `Contrôle externe de la page d’accès à l’intranet depuis GitHub, prévu toutes les 5 minutes.${checked} Le dashboard consulte le résultat chaque minute.`;
+    const detail = sample?.applicationHttpStatus ? ` Page d’accès : HTTP ${sample.entryHttpStatus} vers Microsoft. Santé de l’application : HTTP ${sample.applicationHttpStatus}.` : '';
+    badge.title = `Contrôle externe de la page d’accès à l’intranet depuis GitHub, prévu toutes les 5 minutes.${detail}${checked} Le dashboard consulte le résultat chaque minute.`;
     badge.setAttribute('aria-label', `État du site intranet : ${view.label}.${checked}`);
     if (sample && now() - sample.checkedAt <= HEALTH_MAX_AGE_MS) {
       expiry = schedule(render, Math.max(1, sample.checkedAt + HEALTH_MAX_AGE_MS - now() + 1)); expiry?.unref?.();

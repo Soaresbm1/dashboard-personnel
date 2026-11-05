@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { checkIntranet, TARGET } from '../scripts/check-intranet.mjs';
+import { checkIntranet, TARGET, APPLICATION_TARGET } from '../scripts/check-intranet.mjs';
 import { HEALTH_MAX_AGE_MS, INTRANET_HEALTH_URL, parseIntranetHealth, intranetHealthView } from '../intranet-health-core.mjs';
 import { initializeIntranetHealth } from '../intranet-health.mjs';
 const now = Date.parse('2026-11-05T18:00:00Z');
@@ -29,6 +29,18 @@ test('Timeout, DNS, TLS, network failure and redirect loops never become an HTTP
   }
   let calls = 0; const loop = await checkIntranet({ now: () => now, request: async () => { calls++; return { status: 302, location: '/login' }; } });
   assert.equal(calls, 6); assert.equal(loop.error, 'redirect_loop');
+});
+
+test('Expected Microsoft SSO redirects use application health without visiting Microsoft or retaining OAuth parameters', async () => {
+  for (const status of [200, 404, 503]) {
+    const urls = [];
+    const result = await checkIntranet({ now: () => now, request: async url => { urls.push(url); return url === TARGET
+      ? { status: 302, location: 'https://login.microsoftonline.com/fixture/oauth2/v2.0/authorize?state=private' } : { status }; } });
+    assert.deepEqual(urls, [TARGET, APPLICATION_TARGET]); assert.equal(result.entryHttpStatus, 302); assert.equal(result.applicationHttpStatus, status);
+    const parsed = parseIntranetHealth(result, now);
+    assert.equal(intranetHealthView(parsed, now).state, status === 200 ? 'online' : 'error'); assert.equal(parsed.httpStatus, status);
+    assert.equal(JSON.stringify(result).includes('private'), false);
+  }
 });
 
 test('Old, unavailable and offline checks cannot display a current green indicator', () => {
