@@ -118,6 +118,12 @@ L’API publique [Opendata.ch](https://transport.opendata.ch/docs.html) est inte
 
 La source [opentransportdata.swiss](https://opentransportdata.swiss/) et l’API sont citées dans la fenêtre des départs. L’intégration ne change aucune permission Microsoft ou route de l’intranet.
 
+## Disponibilité de l’intranet
+
+L’indicateur à côté du lien Intranet montre le dernier état HTTP observé depuis GitHub : en ligne, code d’erreur (404, 503, etc.), accès protégé, redirection ou panne réseau. Il vérifie anonymement la page d’entrée web, en suivant uniquement les redirections HTTPS sur le même domaine ; il ne teste pas toutes les fonctions authentifiées de l’application. Aucune session ni donnée personnelle n’est envoyée au contrôle.
+
+Le workflow `Intranet availability` prévoit un contrôle toutes les cinq minutes et publie uniquement le code HTTP, la date, la durée et une catégorie d’erreur sur la branche `intranet-status`. Le dashboard lit ce résultat public chaque minute, sans jeton. GitHub peut retarder ses tâches planifiées : après quinze minutes sans nouveau contrôle, ou si la lecture échoue, le statut devient non vérifiable et ne reste pas vert. L’heure visible correspond au contrôle du site, pas à la lecture du résultat par le navigateur. L’historique est celui de la branche de contrôle ; le code du site sur main n’est pas modifié par ces vérifications.
+
 ## Suivi GitHub
 
 La vue conserve des accents discrets par service. Dans le résumé GitHub, un anneau montre la répartition des dépôts suivis avec ou sans PR ouverte ; les lectures inconnues restent dans une catégorie grise, sans être comptées comme zéro. Le nombre au centre représente les dépôts avec PR, pas le nombre de PR. Le graphique suit les mêmes données, dates, limites et règles de déconnexion que le suivi existant, sans nouvelle requête. Les animations d’apparition sont désactivées si le système demande de réduire les mouvements.

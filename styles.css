@@ -75,6 +75,13 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .quick-access-label { margin-right: 3px; color: var(--ink); font-weight: 600; }
 .quick-access a { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; }
 .quick-access .icon { width: 12px; height: 12px; }
+.intranet-access { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 9px; }
+.intranet-health { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 3px 7px; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.health-dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: currentColor; }
+.intranet-health time { padding-left: 2px; font-size: 9px; font-variant-numeric: tabular-nums; opacity: .85; }
+.intranet-health[data-state="online"] { color: #216d5d; border-color: #c6e1d8; background: #eff9f5; }
+.intranet-health[data-state="warning"] { color: #866017; border-color: #e7d8b4; background: #fff9ec; }
+.intranet-health[data-state="error"] { color: #a13d50; border-color: #ebc5ce; background: #fff2f5; }
 .workplace-tools { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-left: auto; }
 .workplace-tools > button { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); color: var(--ink); font-size: 11px; }
 .workplace-tools > button:hover { background: var(--subtle); }
