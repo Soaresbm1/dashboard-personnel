@@ -129,7 +129,7 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .news-item-content.is-rich > :last-child { margin-bottom: 0; }
 .mail-item.is-important .mail-item-subject { font-weight: 600; }
 .panel-header h2 .item-count { margin-left: 6px; vertical-align: middle; }
-.summary-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, .95fr) minmax(0, 1fr); flex-shrink: 0; margin: 0; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.summary-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.65fr) minmax(0, .8fr) minmax(0, 1.5fr); flex-shrink: 0; margin: 0; padding: 11px 0; border-bottom: 1px solid var(--line); }
 .summary-item { min-width: 0; padding: 0 20px; }
 .summary-item:first-child { padding-left: 0; }
 .summary-item + .summary-item { border-left: 1px solid var(--line); }
@@ -137,14 +137,16 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .summary-item dd { margin: 0; }
 .summary-value { display: block; margin-top: 3px; font-size: 22px; font-weight: 600; letter-spacing: -.5px; line-height: 1.2; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .summary-detail { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.github-strip { display: grid; grid-template-columns: 80px minmax(0, .8fr) minmax(0, 1.4fr) 30px; align-items: center; flex-shrink: 0; gap: 14px; margin-bottom: 10px; padding: 9px 14px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
-.github-strip h2 { margin: 0; font-size: 12px; font-weight: 600; }
-.github-strip h2 a { display: block; font-size: 9px; font-weight: 400; color: var(--muted); }
-#github-repository { max-width: min(220px, 100%); min-width: 0; padding: 0 18px 0 0; border: 0; background-color: transparent; color: var(--ink); font: inherit; font-size: 11px; font-weight: 600; text-overflow: ellipsis; }
+#github-repository { width: 100%; max-width: 100%; min-width: 0; padding: 0 18px 0 0; border: 0; background-color: transparent; color: var(--ink); font: inherit; font-size: 11px; font-weight: 600; text-overflow: ellipsis; }
 #github-repository:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
-.github-account-summary { overflow: hidden; }
+.github-summary { padding-right: 0; }
+.github-summary dt { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.github-account-link { margin-left: 5px; font-size: 9px; text-decoration: underline; text-underline-offset: 2px; }
+.github-summary #github-refresh { width: 24px; height: 24px; flex-shrink: 0; }
+.github-account-summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 10px; line-height: 1.5; }
+.github-summary .github-project { margin-top: 2px; }
+.github-summary .github-checked { display: block; margin-top: 1px; }
 .github-project { min-width: 0; }
-.github-project + .github-project { padding-left: 14px; border-left: 1px solid var(--line); }
 .github-project-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; font-size: 10px; line-height: 1.6; }
 .github-project-name { font-size: 11px; font-weight: 600; }
 .github-deployment { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -155,7 +157,7 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .teams-join:hover { background: #f3f3f0; }
 .outlook-event-join { display: flex; width: fit-content; margin-top: 4px; }
 .summary-item[data-state="unavailable"] .summary-value, .summary-item[data-state="loading"] .summary-value { color: var(--muted); }
-.transport-summary { grid-column: span 2; }
+.transport-summary { grid-column: auto; }
 .transport-summary-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 2px 10px; }
 .transport-summary-links { display: inline-flex; align-items: baseline; gap: 10px; font-size: 9px; }
 .transport-summary-links a, .transport-summary-links button { padding: 0; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
@@ -173,19 +175,6 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .transport-inline-notice { margin-top: 2px; }
 .transport-summary[data-state="stale"] .transport-inline-row { color: var(--muted); }
 .weather-summary { padding-right: 20px; }
-.myabacus-summary { padding-right: 0; }
-.myabacus-summary dt { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 2px 8px; }
-.myabacus-summary dt button { padding: 0; font-size: 9px; text-decoration: underline; text-underline-offset: 2px; }
-.myabacus-values { display: flex; align-items: baseline; gap: 14px; }
-.myabacus-values > span { min-width: 0; }
-.myabacus-values .summary-value { font-size: 20px; white-space: nowrap; }
-.myabacus-label { display: block; margin-top: 2px; color: var(--muted); font-size: 9px; }
-.myabacus-last-read { display: block; color: var(--muted); font-size: 9px; line-height: 1.5; }
-.myabacus-summary[data-state="stale"] .summary-value { color: var(--muted); }
-.myabacus-help { font-size: 12px; line-height: 1.65; }
-.myabacus-help ol { padding-left: 20px; }
-.myabacus-help li + li, .myabacus-help p { margin-top: 12px; }
-.myabacus-help a { text-decoration: underline; text-underline-offset: 2px; }
 .weather-summary dt { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 2px 8px; }
 .weather-source { font-size: 9px; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
 .weather-value { display: flex; align-items: baseline; gap: 10px; }
@@ -296,11 +285,6 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
   .summary-item.weather-summary { border-left: 0; padding-left: 0; }
 }
 @media (max-width: 520px) {
-  .github-strip { grid-template-columns: minmax(0, 1fr) 40px; gap: 8px; padding: 12px; }
-  .github-strip h2 { grid-column: 1; }
-  .github-strip > .icon-button { grid-column: 2; grid-row: 1; }
-  .github-project { grid-column: 1 / -1; }
-  .github-project + .github-project { padding: 8px 0 0; border-left: 0; border-top: 1px solid var(--line); }
   .topbar-right { gap: 12px; }
   .notification-item { grid-template-columns: minmax(0, 1fr); gap: 5px; }
   .notification-seen { justify-self: start; min-height: 38px; padding-left: 0; }
@@ -319,9 +303,9 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
   .summary-item { padding: 11px 0; }
   .summary-item:first-child { order: 1; border-bottom: 1px solid var(--line); }
   .summary-item.transport-summary { order: 3; grid-column: 1 / -1; border-left: 0; }
+  .summary-item.github-summary { order: 4; grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); }
+  .github-summary #github-refresh { width: 36px; height: 36px; }
   .summary-item.weather-summary { order: 2; grid-column: 2; padding-left: 18px; border-bottom: 1px solid var(--line); }
-  .summary-item.myabacus-summary { order: 4; grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); }
-  .myabacus-values { gap: 26px; }
   .weather-summary dt { display: block; }
   .weather-source { margin-left: 6px; }
   .weather-value { gap: 7px; }

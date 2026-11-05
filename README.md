@@ -118,13 +118,9 @@ L’API publique [Opendata.ch](https://transport.opendata.ch/docs.html) est inte
 
 La source [opentransportdata.swiss](https://opentransportdata.swiss/) et l’API sont citées dans la fenêtre des départs. L’intégration ne change aucune permission Microsoft ou route de l’intranet.
 
-## MyAbacus local
-
-Le résumé comprend un bloc compact pour le solde d’heures et les congés. L’extension Edge personnelle `extension-myabacus` 1.1.1 ouvre un onglet MyAbacus temporaire en arrière-plan environ toutes les dix minutes tant que le dashboard est ouvert et connecté, puis referme uniquement cet onglet après lecture. Les onglets préexistants ne sont pas manipulés et la prise en main de l’onglet temporaire empêche sa fermeture automatique. Aucun appel direct vers une API Abacus ni ajout de permission Microsoft. **En cas d’échec, les dernières valeurs sont conservées pendant la session du navigateur**, avec leurs dates d’origine et une indication de données anciennes ; ni un délai de quinze minutes ni minuit ne les retirent. Le bloc et le cache sont purgés à la déconnexion Microsoft ou lorsqu’un autre compte MyAbacus est confirmé. Le stockage reste temporaire et disparaît au redémarrage du navigateur ou rechargement de l’extension. Une session MyAbacus expirée nécessite une reconnexion manuelle ; le bouton « Actualiser maintenant » relance ensuite une lecture. Les alarmes servent au nettoyage des traitements, sans lancer de lecture lorsque le dashboard est fermé. Consulter le README de l’extension pour l’installation, les restrictions et les tests.
-
 ## Suivi GitHub
 
-Le bloc compact suit les dépôts du compte `Soaresbm1` : nombre de dépôts, total des PR ouvertes (brouillons compris), publications en échec et sélecteur de dépôt pour consulter sa dernière publication de production et ses modifications en attente. Les liens ouvrent GitHub en lecture seule. Aucun lancement, fusion ou modification n’est proposé.
+Le bloc compact, placé dans le résumé du haut à côté de la météo, suit les dépôts du compte `Soaresbm1` : nombre de dépôts, total des PR ouvertes (brouillons compris), publications en échec et sélecteur de dépôt pour consulter sa dernière publication de production et ses modifications en attente. Les liens ouvrent GitHub en lecture seule. Aucun lancement, fusion ou modification n’est proposé.
 
 L’API propriétaire `GET https://intranet.isp-spi.ch/api/dashboard/v1/github` utilise la permission Microsoft existante `Dashboard.Read`. L’actualisation et le cache serveur durent cinq minutes ; la page suspend les lectures hors ligne et dans un onglet masqué. Les métadonnées et le dépôt sélectionné restent uniquement en mémoire ; une panne transitoire conserve les dernières valeurs datées, une déconnexion ou un refus confirmé les retire.
 
