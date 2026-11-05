@@ -83,6 +83,20 @@ export function githubSummary(value) {
   return { repositories: `${projects.length}${value.hasMore ? '+' : ''} dépôt${projects.length === 1 ? '' : 's'}${stale ? ' · anciennes données' : ''}`,
     detail: `${total}${partial ? '+' : ''} PR ouverte${total === 1 ? '' : 's'}${failed ? ` · ${failed} publication${failed === 1 ? '' : 's'} en échec` : ''}${partial ? ' · lecture partielle' : ''}` };
 }
+export function githubPullDistribution(value) {
+  if (value?.state !== 'ready') return null;
+  const total = value.projects.length;
+  const withPulls = value.projects.filter(p => p.pulls.state === 'ready' && p.pulls.count > 0).length;
+  const withoutPulls = value.projects.filter(p => p.pulls.state === 'ready' && p.pulls.count === 0).length;
+  const unknown = total - withPulls - withoutPulls;
+  const stale = !!(value.stale || value.projects.some(p => p.pulls.stale));
+  const caption = `${withPulls} avec PR · ${withoutPulls} sans PR${unknown ? ` · ${unknown} inconnu${unknown === 1 ? '' : 's'}` : ''}`;
+  return { total, withPulls, withoutPulls, unknown,
+    activePercent: total ? 100 * withPulls / total : 0,
+    knownPercent: total ? 100 * (withPulls + withoutPulls) / total : 0,
+    caption,
+    label: `Répartition des ${total} dépôts suivis : ${caption}.${value.hasMore ? ' Liste de dépôts partielle.' : ''}${stale ? ' Dernières données conservées.' : ''}` };
+}
 export function githubDeploymentLabel(value) {
   if (value?.state !== 'ready') return value?.state === 'access_denied' ? 'Accès GitHub refusé'
     : value?.state === 'rate_limited' ? 'Limite GitHub atteinte' : 'Déploiement indisponible';

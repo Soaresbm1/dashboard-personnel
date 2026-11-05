@@ -74,7 +74,13 @@
         <div id="github-overview" class="summary-item github-summary" role="region" aria-labelledby="github-title" aria-busy="false">
           <dt><span id="github-title">GitHub <a class="github-account-link" href="https://github.com/Soaresbm1?tab=repositories" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Soaresbm1</a></span><button id="github-refresh" type="button" class="icon-button" aria-label="Actualiser le suivi GitHub" title="GitHub · actualisation automatique toutes les 5 minutes" hidden><svg class="icon" aria-hidden="true"><use href="#i-reset"/></svg></button></dt>
           <dd>
-            <div class="github-account-summary" aria-label="Résumé des dépôts Soaresbm1"><span id="github-repository-count" class="github-project-name">Dépôts : —</span><span id="github-account-detail">Modifications : —</span></div>
+            <div class="github-stats">
+              <div id="github-activity-chart" class="github-donut" role="img" hidden><span id="github-chart-value" aria-hidden="true"></span></div>
+              <div class="github-metrics">
+                <div class="github-account-summary" aria-label="Résumé des dépôts Soaresbm1"><span id="github-repository-count" class="github-project-name">Dépôts : —</span><span id="github-account-detail">Modifications : —</span></div>
+                <p id="github-chart-caption" class="github-chart-caption" hidden></p>
+              </div>
+            </div>
             <article id="github-selected" class="github-project" aria-label="Dépôt GitHub sélectionné">
               <div class="github-project-line"><label class="sr-only" for="github-repository">Choisir un dépôt Soaresbm1</label><select id="github-repository" hidden></select></div>
               <div class="github-project-line"><a id="github-selected-deployment" class="github-deployment" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Chargement…</a><a id="github-selected-pulls" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Modifications : —</a></div>

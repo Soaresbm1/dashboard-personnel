@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { GITHUB_API_URL, safeGithubUrl, normalizeGithubOverview, retainGithubOverview, githubDeploymentLabel, githubSummary } from '../github-core.mjs';
+import { GITHUB_API_URL, safeGithubUrl, normalizeGithubOverview, retainGithubOverview, githubDeploymentLabel, githubSummary, githubPullDistribution } from '../github-core.mjs';
 import { initializeGithubOverview } from '../github.mjs';
 import { MICROSOFT_DEPLOYMENT, microsoftSessionKey, clearMicrosoftSession, connectMicrosoftServices } from '../microsoft-session.mjs';
 import { INTRANET_DEPLOYMENT_IDS, intranetScope } from '../intranet-core.mjs';
@@ -29,6 +29,17 @@ test('Summary counts all accessible repositories and marks incomplete counts exp
  assert.match(githubSummary(normalized(body({intranet:{pulls:{state:'access_denied'}}}))).detail,/1\+.*lecture partielle/);
  assert.throws(()=>normalized(body({dashboard:{pulls:{state:'ready',count:-1,hasMore:false,items:[]}}})));
 });
+test('Chart counts repositories rather than PRs and keeps unknown, empty, partial and stale data distinct',()=>{
+ const value=normalized({...body(),hasMore:true,projects:[project('dashboard',{pulls:{state:'ready',count:5,hasMore:false,items:[]}}),project('intranet',{pulls:{state:'ready',count:0,hasMore:false,items:[]}}),project('intranet',{name:'unknown-fixture',repository:'Soaresbm1/unknown-fixture',pulls:{state:'access_denied'}})]});
+ const chart=githubPullDistribution(value);
+ assert.deepEqual([chart.total,chart.withPulls,chart.withoutPulls,chart.unknown],[3,1,1,1]);
+ assert.equal(chart.activePercent,100/3);assert.equal(chart.knownPercent,200/3);
+ assert.match(chart.label,/1 inconnu.*partielle/);
+ assert.equal(githubPullDistribution({state:'access_denied'}),null);
+ const empty=githubPullDistribution(normalized({...body(),projects:[]}));assert.equal(empty.total,0);assert.equal(empty.activePercent,0);assert.equal(empty.knownPercent,0);
+ assert.match(githubPullDistribution(retainGithubOverview({state:'unavailable'},value)).label,/Dernières données conservées/);
+});
+
 test('Titles are text, PR links are rebuilt, and transient failures retain dates without restoring denied access',()=>{
  const old=normalized(body({intranet:{pulls:{state:'ready',count:1,hasMore:false,items:[{number:7,title:'<img onerror=fixture>',url:'javascript:bad',draft:true}]}}}));
  assert.equal(old.projects[1].pulls.items[0].url,'https://github.com/Soaresbm1/private-fixture/pull/7');
@@ -44,14 +55,14 @@ const owner={tenantId:MICROSOFT_DEPLOYMENT.tenantId,localAccountId:MICROSOFT_DEP
 function harness(options={}) {
   const nodes=new Map(), calls=[], writes=[], storage=new Map(options.remembered===false?[]:[[microsoftSessionKey(INTRANET_DEPLOYMENT_IDS),'1']]);
   class Element {
-    constructor(){this.textContent='';this.hidden=false;this.disabled=false;this.dataset={};this.attrs={};this.listeners=new Map();}
+    constructor(){this.textContent='';this.hidden=false;this.disabled=false;this.dataset={};this.attrs={};this.listeners=new Map();const values=new Map();this.style={setProperty:(k,v)=>values.set(k,v),removeProperty:k=>values.delete(k),getPropertyValue:k=>values.get(k)||''};}
     get href(){return this.attrs.href;} set href(v){this.attrs.href=v;}
     get title(){return this.attrs.title;} set title(v){this.attrs.title=v;}
     setAttribute(k,v){this.attrs[k]=v;} removeAttribute(k){delete this.attrs[k];}
     replaceChildren(...children){this.children=children;}
     addEventListener(k,f){this.listeners.set(k,f);} removeEventListener(k){this.listeners.delete(k);}
   }
-  for(const id of ['github-overview','github-refresh','github-status','intranet-config-form','github-repository','github-repository-count','github-account-detail','github-selected','github-selected-deployment','github-selected-pulls','github-selected-checked'])nodes.set(`#${id}`,new Element());
+  for(const id of ['github-overview','github-refresh','github-status','intranet-config-form','github-repository','github-repository-count','github-account-detail','github-selected','github-selected-deployment','github-selected-pulls','github-selected-checked','github-activity-chart','github-chart-value','github-chart-caption'])nodes.set(`#${id}`,new Element());
   const listeners=new Map(), win={navigator:{onLine:true},addEventListener(k,f){listeners.set(k,f);},removeEventListener(k){listeners.delete(k);}};
   const storageApi={getItem:k=>storage.get(k)??null,setItem(k,v){writes.push([k,v]);storage.set(k,v);},removeItem(k){storage.delete(k);}}; win.localStorage=storageApi;
   const doc={createElement:()=>new Element(),baseURI:'https://example.test/dashboard/',hidden:false,querySelector:k=>nodes.get(k)};
@@ -76,6 +87,7 @@ test('Remembered owner loads only the fixed API with the existing delegated scop
   const request=h.calls.find(c=>c[0]==='fetch');assert.equal(request[1],GITHUB_API_URL);assert.equal(request[2].method,'GET');assert.equal(request[2].credentials,'omit');assert.equal(request[2].redirect,'error');
   assert.deepEqual(h.calls.find(c=>c[0]==='token')[1].scopes,[intranetScope(INTRANET_DEPLOYMENT_IDS)]);
   assert.equal(h.nodes.get('#github-selected-pulls').textContent,'1 modification en attente');assert.equal(h.nodes.get('#github-selected-deployment').textContent,'Publication réussie');
+  assert.equal(h.nodes.get('#github-activity-chart').hidden,false);assert.equal(h.nodes.get('#github-chart-caption').textContent,'2 avec PR · 0 sans PR');
   assert.deepEqual(h.writes,[]);assert.equal(h.auto.config.intervalMs,300000);h.instance.dispose();
 });
 test('Other accounts and disconnected pages do not fetch data or open authentication popups', async () => {
@@ -86,18 +98,20 @@ test('Other accounts and disconnected pages do not fetch data or open authentica
 test('A network failure keeps last values dated; a successful empty response replaces old counts', async () => {
   let mode='good';const h=harness({fetch(){if(mode==='network')throw new TypeError('fixture');return new Response(JSON.stringify(mode==='empty'?body({dashboard:{pulls:{state:'ready',count:0,hasMore:false,items:[]}},intranet:{pulls:{state:'ready',count:0,hasMore:false,items:[]}}}):body()),{status:200});}});
   await settle();await settle();mode='network';await h.instance.refresh();assert.match(h.nodes.get('#github-selected-pulls').textContent,/Dernières données.*1 modification/);
+  assert.match(h.nodes.get('#github-activity-chart').attrs['aria-label'],/Dernières données conservées/);
   assert.match(h.nodes.get('#github-selected-checked').textContent,/Données du/);
-  mode='empty';await h.instance.refresh();assert.equal(h.nodes.get('#github-selected-pulls').textContent,'0 modifications en attente');h.instance.dispose();
+  mode='empty';await h.instance.refresh();assert.equal(h.nodes.get('#github-selected-pulls').textContent,'0 modifications en attente');assert.equal(h.nodes.get('#github-chart-caption').textContent,'0 avec PR · 2 sans PR');h.instance.dispose();
 });
 test('Expired Microsoft access clears private metadata and stops refreshing until central sign-in', async () => {
   const h=harness();await settle();await settle();h.expire();await h.instance.refresh();
   assert.equal(h.nodes.get('#github-selected-deployment').href,undefined);assert.equal(h.nodes.get('#github-selected-pulls').title,undefined);
+  assert.equal(h.nodes.get('#github-activity-chart').hidden,true);assert.equal(h.nodes.get('#github-activity-chart').attrs['aria-label'],undefined);assert.equal(h.nodes.get('#github-chart-caption').textContent,'');assert.equal(h.nodes.get('#github-activity-chart').style.getPropertyValue('--pr-active'),'');
   assert.equal(h.nodes.get('#github-selected-pulls').textContent,'Modifications : —');assert.equal(h.auto.started,false);h.instance.dispose();
 });
 test('Sign-out discards an in-flight API response and clears private titles', async () => {
   let finish;const h=harness({fetch:()=>new Promise(resolve=>{finish=resolve;})});await settle();
   await clearMicrosoftSession({application:h.app,account:owner,config:INTRANET_DEPLOYMENT_IDS,storage:h.storageApi,window:h.win});
-  finish(new Response(JSON.stringify(body()),{status:200}));await settle();assert.equal(h.nodes.get('#github-selected-pulls').textContent,'Modifications : —');assert.equal(h.auto.started,false);h.instance.dispose();
+  finish(new Response(JSON.stringify(body()),{status:200}));await settle();assert.equal(h.nodes.get('#github-selected-pulls').textContent,'Modifications : —');assert.equal(h.nodes.get('#github-activity-chart').hidden,true);assert.equal(h.nodes.get('#github-chart-value').textContent,'');assert.equal(h.auto.started,false);h.instance.dispose();
 });
 test('Central Microsoft sign-in restores GitHub without another popup', async () => {
   const h=harness({remembered:false});await settle();

@@ -120,6 +120,8 @@ La source [opentransportdata.swiss](https://opentransportdata.swiss/) et l’API
 
 ## Suivi GitHub
 
+La vue conserve des accents discrets par service. Dans le résumé GitHub, un anneau montre la répartition des dépôts suivis avec ou sans PR ouverte ; les lectures inconnues restent dans une catégorie grise, sans être comptées comme zéro. Le nombre au centre représente les dépôts avec PR, pas le nombre de PR. Le graphique suit les mêmes données, dates, limites et règles de déconnexion que le suivi existant, sans nouvelle requête. Les animations d’apparition sont désactivées si le système demande de réduire les mouvements.
+
 Le bloc compact, placé dans le résumé du haut à côté de la météo, suit les dépôts du compte `Soaresbm1` : nombre de dépôts, total des PR ouvertes (brouillons compris), publications en échec et sélecteur de dépôt pour consulter sa dernière publication de production et ses modifications en attente. Les liens ouvrent GitHub en lecture seule. Aucun lancement, fusion ou modification n’est proposé.
 
 L’API propriétaire `GET https://intranet.isp-spi.ch/api/dashboard/v1/github` utilise la permission Microsoft existante `Dashboard.Read`. L’actualisation et le cache serveur durent cinq minutes ; la page suspend les lectures hors ligne et dans un onglet masqué. Les métadonnées et le dépôt sélectionné restent uniquement en mémoire ; une panne transitoire conserve les dernières valeurs datées, une déconnexion ou un refus confirmé les retire.
