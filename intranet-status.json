@@ -1,1 +1,1 @@
-{"schemaVersion":1,"target":"https://intranet.isp-spi.ch/intranet","checkedAt":"2026-11-05T22:44:31.977Z","outcome":"redirect","httpStatus":302,"error":null,"latencyMs":2657}
+{"schemaVersion":1,"target":"https://intranet.isp-spi.ch/intranet","checkedAt":"2026-11-05T22:49:56.481Z","outcome":"online","httpStatus":200,"error":null,"latencyMs":2842,"entryHttpStatus":302,"applicationHttpStatus":200}
