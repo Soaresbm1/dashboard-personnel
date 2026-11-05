@@ -1,0 +1,32 @@
+name: Intranet availability
+on:
+  schedule:
+    - cron: '2-57/5 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/intranet-availability.yml'
+      - 'scripts/check-intranet.mjs'
+      - 'scripts/publish-intranet-status.mjs'
+permissions:
+  contents: read
+concurrency:
+  group: intranet-availability
+  cancel-in-progress: false
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check the intranet web entry point
+        run: node scripts/check-intranet.mjs
+      - name: Publish the anonymous result
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/publish-intranet-status.mjs
