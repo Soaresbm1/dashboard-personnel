@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build:auth": "node scripts/build-msal.mjs",
-    "check": "node --check app.js && node --check outlook.js && node --check outlook-core.mjs && node --check intranet.js && node --check intranet-core.mjs && node --check microsoft-session.mjs && node --check microsoft-connection.mjs && node --check auto-refresh.mjs && node --check dashboard-summary.mjs && node --check mail.js && node --check mail-core.mjs && node --check news.js && node --check news-core.mjs && node --check news-content.mjs && node --check workplace-core.mjs && node --check workplace-tools.mjs && node --check weather-core.mjs && node --check weather.mjs && node --check transport-core.mjs && node --check transport.mjs && node --check notifications-core.mjs && node --check notifications.mjs && node --check myabacus-core.mjs && node --check myabacus.mjs && node --check github-core.mjs && node --check github.mjs"
+    "check": "node --check app.js && node --check outlook.js && node --check outlook-core.mjs && node --check intranet.js && node --check intranet-core.mjs && node --check microsoft-session.mjs && node --check microsoft-connection.mjs && node --check auto-refresh.mjs && node --check dashboard-summary.mjs && node --check mail.js && node --check mail-core.mjs && node --check news.js && node --check news-core.mjs && node --check news-content.mjs && node --check workplace-core.mjs && node --check workplace-tools.mjs && node --check weather-core.mjs && node --check weather.mjs && node --check transport-core.mjs && node --check transport.mjs && node --check notifications-core.mjs && node --check notifications.mjs && node --check myabacus-core.mjs && node --check myabacus.mjs && node --check github-core.mjs && node --check github.mjs",
+    "test:github": "node --test tests/github-overview.test.mjs"
   },
   "dependencies": {
     "@azure/msal-browser": "5.27.0"
