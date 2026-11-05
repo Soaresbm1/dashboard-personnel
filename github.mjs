@@ -1,4 +1,4 @@
-import { GITHUB_API_URL, normalizeGithubOverview, retainGithubOverview, githubDeploymentLabel, githubSummary } from './github-core.mjs';
+import { GITHUB_API_URL, normalizeGithubOverview, retainGithubOverview, githubDeploymentLabel, githubSummary, githubPullDistribution } from './github-core.mjs';
 import { INTRANET_CONFIG_KEY, INTRANET_DEPLOYMENT_IDS, normalizeIntranetConfig, intranetScope } from './intranet-core.mjs';
 import { getMicrosoftClient, getRememberedMicrosoftAccount, isDashboardMicrosoftAccount, subscribeMicrosoftSignOut, subscribeMicrosoftSignIn } from './microsoft-session.mjs';
 import { createAutoRefresh } from './auto-refresh.mjs';
@@ -24,10 +24,15 @@ export function initializeGithubOverview(options = {}) {
   function clear(message) {
     lastGood = null; selected = '';
     get('#github-repository').replaceChildren(); get('#github-repository').hidden = true;
-    get('#github-selected-deployment').textContent = message; get('#github-selected-deployment').removeAttribute('href'); get('#github-selected-deployment').removeAttribute('title');
+    get('#github-selected-deployment').textContent = message; get('#github-selected-deployment').removeAttribute('href'); get('#github-selected-deployment').removeAttribute('title'); get('#github-selected-deployment').dataset.status = 'unknown';
     get('#github-selected-pulls').textContent = 'Modifications : —'; get('#github-selected-pulls').removeAttribute('href'); get('#github-selected-pulls').removeAttribute('title');
     get('#github-selected-checked').textContent = ''; get('#github-selected').dataset.state = 'unavailable';
     get('#github-repository-count').textContent = 'Dépôts : —'; get('#github-account-detail').textContent = 'Modifications : —';
+    const chart = get('#github-activity-chart');
+    chart.hidden = true; chart.removeAttribute('aria-label'); chart.removeAttribute('title');
+    chart.style.removeProperty('--pr-active'); chart.style.removeProperty('--pr-known');
+    get('#github-chart-value').textContent = '';
+    get('#github-chart-caption').textContent = ''; get('#github-chart-caption').hidden = true;
   }
   function cancel() { generation++; controller?.abort(); controller = null; fetching = false; }
   function signedOut(pending = false) {
@@ -73,6 +78,14 @@ export function initializeGithubOverview(options = {}) {
     const summary = githubSummary(overview);
     get('#github-repository-count').textContent = summary.repositories;
     get('#github-account-detail').textContent = summary.detail;
+    const distribution = githubPullDistribution(overview), chart = get('#github-activity-chart');
+    chart.hidden = !distribution.total;
+    chart.style.setProperty('--pr-active', `${distribution.activePercent}%`);
+    chart.style.setProperty('--pr-known', `${distribution.knownPercent}%`);
+    chart.setAttribute('aria-label', distribution.label); chart.title = distribution.label;
+    get('#github-chart-value').textContent = String(distribution.withPulls);
+    get('#github-chart-caption').textContent = distribution.caption;
+    get('#github-chart-caption').hidden = !distribution.total;
     const selector = get('#github-repository');
     selector.replaceChildren(...overview.projects.map(project => {
       const option = doc.createElement('option'); option.value = project.repository;
@@ -91,6 +104,7 @@ export function initializeGithubOverview(options = {}) {
       const prefix = '#github-selected', element = get(prefix), deployment = get(`${prefix}-deployment`), pulls = get(`${prefix}-pulls`);
       element.dataset.state = 'ready';
       const details = project.deployment;
+      deployment.dataset.status = details.state === 'ready' ? details.status : 'unknown';
       deployment.textContent = `${details.stale ? 'Dernières données · ' : ''}${githubDeploymentLabel(details)}`;
       if (details.url) deployment.href = details.url; else deployment.removeAttribute('href');
       deployment.title = details.at ? `${details.environment || 'Production'} · ${stamp(details.at)}` : details.status === 'untracked' ? 'Aucune production identifiée parmi les 20 dernières publications GitHub. Les tests ne sont pas un déploiement.' : '';
