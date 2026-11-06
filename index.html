@@ -154,10 +154,7 @@
             <div><h2 id="mail-title">Mails Outlook <span id="mail-unread-count" class="item-count"></span></h2><p id="mail-account" class="panel-account">Boîte de réception</p></div>
             <button id="mail-refresh" type="button" class="icon-button" aria-label="Actualiser les mails Outlook" title="Actualiser les mails" hidden><svg class="icon" aria-hidden="true"><use href="#i-reset"/></svg></button>
           </header>
-          <div class="outlook-range" role="group" aria-label="Mails à afficher">
-            <button type="button" data-mail-filter="unread" aria-pressed="true" disabled>Non lus</button>
-            <button type="button" data-mail-filter="important" aria-pressed="false" disabled>Importants</button>
-          </div>
+          <p id="mail-view-label" class="mail-view-label">Non lus en priorité · sinon les 5 derniers</p>
           <p id="mail-status" class="service-status" role="status" aria-live="polite">Préparation du courrier…</p>
           <div id="mail-items" class="scroll-list" role="region" aria-label="Liste des mails" tabindex="0" aria-busy="false"><p class="mail-empty">Vos mails apparaîtront ici.</p></div>
           <div class="connection-panel" hidden><button id="mail-connect" class="button button-primary" type="button">Connecter les mails Outlook</button></div>

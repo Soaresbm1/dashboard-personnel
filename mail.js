@@ -23,7 +23,7 @@ export function initializeMailPreview(options = {}) {
   }
   let config = readConfig(), pca = null, sdk = null, account = null;
   let sdkLoading = false, authBusy = false, signingOut = false, needsReconnect = false, accessBlocked = false, fetching = false;
-  let selectedFilter = 'unread', sdkGeneration = 0, connectionGeneration = 0, requestGeneration = 0;
+  let sdkGeneration = 0, connectionGeneration = 0, requestGeneration = 0;
   let controller = null, retryUntil = 0, retryTimer = null, lastRequestStartedAt = -Infinity, lastGood = null, unsubscribeSignOut = null, unsubscribeSignIn = null, disposed = false;
 
   function setStatus(text, state = '') { get('#mail-status').textContent = text; get('#mail-status').dataset.state = state; }
@@ -48,10 +48,9 @@ export function initializeMailPreview(options = {}) {
     get('#mail-disconnect').disabled = authBusy;
     get('#mail-account').textContent = account ? account.username || account.name || 'Compte Microsoft 365 connecté' : 'Boîte de réception Microsoft 365';
     get('#mail-items').setAttribute('aria-busy', String(fetching));
-    doc.querySelectorAll('[data-mail-filter]').forEach(button => {
-      button.disabled = !account || authBusy || needsReconnect || nowMs() < retryUntil;
-      button.setAttribute('aria-pressed', String(button.dataset.mailFilter === selectedFilter));
-    });
+    const label = lastGood ? lastGood.filter === 'unread' ? 'Non lus' : '5 derniers mails' : 'Non lus en priorité · sinon les 5 derniers';
+    get('#mail-view-label').textContent = label;
+    get('#mail-items').setAttribute('aria-label', `Liste des mails · ${label}`);
   }
   function cancelRequests({ resetThrottle = false } = {}) {
     requestGeneration++; controller?.abort(); controller = null; fetching = false;
@@ -152,7 +151,7 @@ export function initializeMailPreview(options = {}) {
   }
 
   function renderMessages(messages) {
-    if (!messages.length) { empty(selectedFilter === 'important' ? 'Aucun mail d’importance haute dans votre boîte de réception.' : 'Aucun mail non lu dans votre boîte de réception.'); return; }
+    if (!messages.length) { empty('Aucun mail à afficher dans votre boîte de réception.'); return; }
     const fragment = doc.createDocumentFragment();
     for (const message of messages) {
       const row = doc.createElement('article'); row.className = 'mail-item'; row.classList.toggle('is-important', message.importance === 'high');
@@ -174,8 +173,8 @@ export function initializeMailPreview(options = {}) {
     if (configChanged()) return;
     if (!account || !pca || sdkLoading || authBusy || needsReconnect || nowMs() < retryUntil || automatic && (fetching || accessBlocked)) return;
     lastRequestStartedAt = nowMs(); cancelRequests();
-    const generation = requestGeneration, application = pca, signedInAccount = account, requestedFilter = selectedFilter;
-    const preserve = automatic && lastGood?.account === signedInAccount && lastGood.filter === requestedFilter;
+    const generation = requestGeneration, application = pca, signedInAccount = account;
+    const preserve = automatic && lastGood?.account === signedInAccount;
     const abortController = new AbortController(); controller = abortController; fetching = true;
     if (!preserve) { clearMessages('Chargement des mails Outlook…'); setStatus('Lecture de la boîte de réception…', 'loading'); }
     renderControls();
@@ -201,8 +200,9 @@ export function initializeMailPreview(options = {}) {
       if (!token) throw Object.assign(new Error('Missing mail access token'), { notificationAccessUnavailable: true });
       const folder = await getJson(inboxUnreadCountUrl());
       if (generation !== requestGeneration) return;
-      const unreadCount = normalizeUnreadCount(folder.unreadItemCount);
+      let unreadCount = normalizeUnreadCount(folder.unreadItemCount);
       if (unreadCount === null) throw Object.assign(new Error('Invalid inbox count'), { unsafeResponse: true });
+      let requestedFilter = unreadCount > 0 ? 'unread' : 'recent';
       let page = mailListUrl(requestedFilter), pages = 0, values = [], messages = [];
       const visited = new Set();
       while (page && messages.length < MAIL_PREVIEW_LIMIT && pages < MAIL_PREVIEW_PAGES) {
@@ -214,8 +214,15 @@ export function initializeMailPreview(options = {}) {
         if (!Array.isArray(body.value)) throw Object.assign(new Error('Invalid mail response'), { unsafeResponse: true });
         values.push(...body.value.slice(0, 100));
         messages = normalizeMailMessages(values, requestedFilter); pages++; page = body['@odata.nextLink'] || null;
+        // A mail may arrive between the folder count and the recent-message query.
+        // Switch back to an unread-only query before displaying any read messages.
+        if (requestedFilter === 'recent' && messages.some(message => !message.isRead)) {
+          unreadCount = messages.filter(message => !message.isRead).length;
+          requestedFilter = 'unread'; page = mailListUrl('unread'); pages = 0; values = []; messages = [];
+        }
       }
       if (generation !== requestGeneration) return;
+      if (requestedFilter === 'unread') unreadCount = Math.max(unreadCount, messages.length);
       const at = now(), limited = !!page;
       const signature = JSON.stringify({ filter: requestedFilter, localDay: [at.getFullYear(), at.getMonth(), at.getDate()], messages });
       if (!preserve || signature !== lastGood.signature) {
@@ -227,7 +234,7 @@ export function initializeMailPreview(options = {}) {
       accessBlocked = false;
       renderUnreadCount(unreadCount);
       get('#mail-last-updated').textContent = `Actualisé le ${exactTime(at)}`;
-      const description = requestedFilter === 'important' ? 'mails importants · lus ou non' : 'mails non lus';
+      const description = requestedFilter === 'recent' ? 'mails reçus' : 'mails non lus';
       setStatus(`${messages.length === MAIL_PREVIEW_LIMIT ? 'Les 5 derniers' : `${messages.length}`} ${description} · actualisation automatique${limited && messages.length < MAIL_PREVIEW_LIMIT ? ' · aperçu partiel' : ''}`, 'connected');
       autoRefresh.start();
     } catch (error) {
@@ -262,10 +269,6 @@ export function initializeMailPreview(options = {}) {
   get('#mail-connect').addEventListener('click', connect);
   get('#mail-refresh').addEventListener('click', () => refresh());
   get('#mail-disconnect').addEventListener('click', disconnect);
-  doc.querySelectorAll('[data-mail-filter]').forEach(button => button.addEventListener('click', () => {
-    if (disposed || authBusy || needsReconnect || nowMs() < retryUntil) return;
-    selectedFilter = button.dataset.mailFilter === 'important' ? 'important' : 'unread'; renderControls(); refresh();
-  }));
   const onStorage = event => { if (event.key === OUTLOOK_CONFIG_KEY || event.key === null) configChanged(); };
   const onConfigSubmit = () => queueMicrotask(configChanged);
   const onForgetConfig = () => {
