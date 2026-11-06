@@ -118,6 +118,7 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .workplace-reconnect { margin: 10px 0; }
 .workplace-reconnect:has([hidden]) { display: none; }
 .workplace-dialog > .panel-footer { margin: 12px 0 0; padding: 12px 24px; }
+.mail-view-label { margin: 0 0 8px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .mail-empty, .news-empty { margin: 0; padding: 10px 0 12px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .mail-item, .news-item { padding: 7px 0; border-top: 1px solid #eeeeeb; }
 .mail-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; }

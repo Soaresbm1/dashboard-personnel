@@ -66,7 +66,12 @@ export function createNotificationCenter({ now = Date.now, maxNotifications = NO
   function ingestMail(snapshot = {}) {
     const at = begin(snapshot.identity, 'mail', snapshot.at); if (at === null) return;
     const messages = Array.isArray(snapshot.messages) ? snapshot.messages.slice(0, seenLimit) : [];
-    // Important is a different partial preview; it cannot establish a new-mail baseline.
+    if (snapshot.unreadCount === 0) {
+      items = items.filter(item => item.source !== 'mail');
+      if (!mail.ready) mail.startedAt = at;
+      mail.ready = true; emit(); return;
+    }
+    // Other partial previews cannot establish a new-mail baseline.
     if (snapshot.filter !== 'unread') {
       for (const message of messages) if (message?.isRead === true) removeEntity('mail', text(message.id, 1500));
       emit(); return;

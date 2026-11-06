@@ -8,8 +8,8 @@ const FOLDER_PATH = '/v1.0/me/mailFolders/inbox';
 export function mailListUrl(filter = 'unread') {
   const url = new URL(`https://graph.microsoft.com${MESSAGE_PATH}`);
   url.searchParams.set('$select', 'id,subject,from,receivedDateTime,importance,isRead,webLink');
-  // Graph requires the ordered property to precede other properties in $filter.
-  url.searchParams.set('$filter', `receivedDateTime ge 0001-01-01T00:00:00Z and ${filter === 'important' ? "importance eq 'high'" : 'isRead eq false'}`);
+  // Graph requires the ordered property to precede isRead in $filter.
+  if (filter !== 'recent') url.searchParams.set('$filter', 'receivedDateTime ge 0001-01-01T00:00:00Z and isRead eq false');
   url.searchParams.set('$orderby', 'receivedDateTime desc');
   url.searchParams.set('$top', String(MAIL_PREVIEW_LIMIT));
   return url.href;
@@ -52,7 +52,7 @@ export function normalizeMailMessages(values, filter = 'unread') {
   const messages = [], seen = new Set();
   for (const value of values) {
     if (!value || typeof value.id !== 'string' || !value.id || seen.has(value.id)) continue;
-    if (filter === 'important' ? value.importance !== 'high' : value.isRead !== false) continue;
+    if (typeof value.isRead !== 'boolean' || filter !== 'recent' && value.isRead !== false) continue;
     if (typeof value.receivedDateTime !== 'string' || !/(?:z|[+-]\d{2}:\d{2})$/i.test(value.receivedDateTime)) continue;
     const receivedAt = new Date(value.receivedDateTime.replace(/(\.\d{3})\d+/, '$1'));
     if (!Number.isFinite(receivedAt.getTime())) continue;
