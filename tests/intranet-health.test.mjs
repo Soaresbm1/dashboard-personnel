@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { checkIntranet, TARGET, APPLICATION_TARGET } from '../scripts/check-intranet.mjs';
-import { HEALTH_MAX_AGE_MS, INTRANET_HEALTH_URL, parseIntranetHealth, intranetHealthView } from '../intranet-health-core.mjs';
+import { HEALTH_MAX_AGE_MS, INTRANET_HEALTH_URL, INTRANET_HEALTH_CACHE_KEY, parseIntranetHealth, intranetHealthView } from '../intranet-health-core.mjs';
 import { initializeIntranetHealth } from '../intranet-health.mjs';
 const now = Date.parse('2026-11-05T18:00:00Z');
 const sample = (extra = {}) => ({ schemaVersion: 1, target: TARGET, checkedAt: new Date(now).toISOString(), outcome: 'online', httpStatus: 200, error: null, latencyMs: 25, ...extra });
@@ -12,8 +12,8 @@ test('Probe follows only same-origin HTTPS redirects and records the final real 
     const result = await checkIntranet({ now: () => now, request: async url => { urls.push(url); return urls.length === 1 ? { status: 302, location: '/login' } : { status }; } });
     assert.deepEqual(urls, [TARGET, 'https://intranet.isp-spi.ch/login']);
     const parsed = parseIntranetHealth(result, now), view = intranetHealthView(parsed, now);
-    assert.equal(parsed.httpStatus, status); assert.match(view.label, new RegExp(`HTTP ${status}`));
-    assert.equal(view.state, status === 200 ? 'online' : [401, 403, 429].includes(status) ? 'warning' : 'error');
+    assert.equal(parsed.httpStatus, status); assert.match(view.description, new RegExp(`HTTP ${status}`));
+    assert.equal(view.state, status === 200 ? 'online' : 'error');
   }
   for (const location of ['https://login.microsoftonline.com/authorize?state=private', 'http://intranet.isp-spi.ch/login', 'https://user:secret@intranet.isp-spi.ch/login']) {
     let calls = 0; const result = await checkIntranet({ now: () => now, request: async () => { calls++; return { status: 302, location }; } });
@@ -43,11 +43,14 @@ test('Expected Microsoft SSO redirects use application health without visiting M
   }
 });
 
-test('Old, unavailable and offline checks cannot display a current green indicator', () => {
-  const good = parseIntranetHealth(sample(), now);
-  assert.equal(intranetHealthView(good, now + HEALTH_MAX_AGE_MS + 1).state, 'unknown');
-  assert.equal(intranetHealthView(good, now, { feedUnavailable: true }).state, 'unknown');
-  assert.equal(intranetHealthView(good, now, { offline: true }).state, 'unknown');
+test('Old, unavailable and offline checks retain the last green or red result and mark it as retained', () => {
+  for (const [extra, state] of [[{}, 'online'], [{ outcome: 'http_error', httpStatus: 503 }, 'error']]) {
+    const last = parseIntranetHealth(sample(extra), now);
+    for (const view of [intranetHealthView(last, now + HEALTH_MAX_AGE_MS + 1), intranetHealthView(last, now, { feedUnavailable: true }), intranetHealthView(last, now, { offline: true })]) {
+      assert.equal(view.state, state); assert.equal(view.retained, true); assert.match(view.description, state === 'online' ? /HTTP 200/ : /HTTP 503/);
+    }
+  }
+  assert.equal(intranetHealthView(null, now).state, 'unknown');
   for (const extra of [{ httpStatus: 503 }, { checkedAt: new Date(now + 180_000).toISOString() }, { target: 'https://example.test' }, { httpStatus: 0 }, { outcome: 'http_error' }]) assert.throws(() => parseIntranetHealth(sample(extra), now));
 });
 
@@ -65,9 +68,32 @@ test('Frontend uses only the anonymous fixed feed, refreshes every minute, and r
   assert.equal(nodes.get('#intranet-health').dataset.state, 'online'); assert.equal(config.intervalMs, 60_000);
   assert.equal(requests[0][0].split('?')[0], INTRANET_HEALTH_URL); assert.equal(requests[0][1].credentials, 'omit'); assert.equal(requests[0][1].headers, undefined);
   mode = '503'; await service.refresh(); assert.match(nodes.get('#intranet-health-label').textContent, /HTTP 503/); assert.equal(nodes.get('#intranet-health').dataset.state, 'error');
-  mode = 'online'; await service.refresh(); currentNow += HEALTH_MAX_AGE_MS + 1; [...timers.values()].at(-1).fn(); assert.equal(nodes.get('#intranet-health').dataset.state, 'unknown');
-  currentNow = now; mode = 'failed'; await service.refresh(); assert.equal(nodes.get('#intranet-health').dataset.state, 'unknown');
-  win.navigator.onLine = false; events.get('offline')(); assert.match(nodes.get('#intranet-health-label').textContent, /hors ligne/);
+  mode = 'online'; await service.refresh(); currentNow += HEALTH_MAX_AGE_MS + 1; [...timers.values()].at(-1).fn(); assert.equal(nodes.get('#intranet-health').dataset.state, 'online'); assert.match(nodes.get('#intranet-health').title, /relevé ancien/);
+  currentNow = now; mode = 'failed'; await service.refresh(); assert.equal(nodes.get('#intranet-health').dataset.state, 'online'); assert.match(nodes.get('#intranet-health').title, /actualisation indisponible/);
+  win.navigator.onLine = false; events.get('offline')(); assert.equal(nodes.get('#intranet-health').dataset.state, 'online'); assert.match(nodes.get('#intranet-health').title, /hors ligne/);
   win.navigator.onLine = true; mode = 'late'; const pending = service.refresh(); service.dispose(); resolveLate(new Response(JSON.stringify(sample()))); await pending;
-  assert.equal(stopped, true); assert.equal(nodes.get('#intranet-health').dataset.state, 'unknown');
+  assert.equal(stopped, true); assert.equal(nodes.get('#intranet-health').dataset.state, 'online');
+});
+
+test('The latest known status survives reload, failed reads and older feed responses until a newer observation replaces it', async () => {
+  const old = now - 86_400_000;
+  const values = new Map([[INTRANET_HEALTH_CACHE_KEY, JSON.stringify(sample({ outcome: 'http_error', httpStatus: 503, checkedAt: new Date(old).toISOString() }))]]);
+  const storage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
+  let response = sample({ checkedAt: new Date(old - 1000).toISOString() }), offline = false;
+  function start() {
+    const nodes = new Map(['intranet-health', 'intranet-health-label', 'intranet-health-time'].map(id => [`#${id}`, { dataset: {}, setAttribute() {}, removeAttribute() {} }]));
+    const win = { navigator: { onLine: !offline }, localStorage: storage };
+    const instance = initializeIntranetHealth({ document: { hidden: false, querySelector: key => nodes.get(key) }, window: win, now: () => now,
+      setTimeout: () => 1, clearTimeout() {}, autoRefreshFactory: () => ({ start() {}, dispose() {} }),
+      fetch: async () => { if (response === null) throw new Error('feed unavailable'); return new Response(JSON.stringify(response)); } });
+    return { instance, nodes };
+  }
+  const first = start(); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(first.nodes.get('#intranet-health-label').textContent, 'HTTP 503');
+  assert.equal(first.nodes.get('#intranet-health').dataset.retained, 'true');
+  assert.equal(JSON.parse(values.get(INTRANET_HEALTH_CACHE_KEY)).httpStatus, 503);
+  response = null; await first.instance.refresh(); assert.equal(first.nodes.get('#intranet-health').dataset.state, 'error'); first.instance.dispose();
+  offline = true; const reloaded = start(); assert.equal(reloaded.nodes.get('#intranet-health-label').textContent, 'HTTP 503'); reloaded.instance.dispose();
+  offline = false; response = sample(); const recovered = start(); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(recovered.nodes.get('#intranet-health').dataset.state, 'online'); assert.equal(JSON.parse(values.get(INTRANET_HEALTH_CACHE_KEY)).httpStatus, 200); recovered.instance.dispose();
 });

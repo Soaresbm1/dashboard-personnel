@@ -1,5 +1,5 @@
 import { createAutoRefresh } from './auto-refresh.mjs';
-import { INTRANET_HEALTH_URL, HEALTH_MAX_AGE_MS, parseIntranetHealth, intranetHealthView } from './intranet-health-core.mjs';
+import { INTRANET_HEALTH_URL, INTRANET_HEALTH_CACHE_KEY, HEALTH_MAX_AGE_MS, parseIntranetHealth, intranetHealthView } from './intranet-health-core.mjs';
 
 export function initializeIntranetHealth(options = {}) {
   const doc = options.document || globalThis.document, win = options.window || globalThis.window;
@@ -9,17 +9,21 @@ export function initializeIntranetHealth(options = {}) {
   const fetcher = options.fetch || globalThis.fetch.bind(globalThis), now = options.now || Date.now;
   const schedule = options.setTimeout || setTimeout, cancel = options.clearTimeout || clearTimeout;
   let sample = null, lastAttempt = -Infinity, busy = false, disposed = false, controller, expiry, failed = false;
+  let storage;
+  try { storage = options.storage || win.localStorage; sample = parseIntranetHealth(JSON.parse(storage?.getItem(INTRANET_HEALTH_CACHE_KEY) || 'null'), now()); }
+  catch { try { storage?.removeItem(INTRANET_HEALTH_CACHE_KEY); } catch { /* Storage is optional. */ } }
   function render() {
     cancel(expiry);
     const view = intranetHealthView(sample, now(), { feedUnavailable: failed, offline: win.navigator?.onLine === false });
-    badge.dataset.state = view.state; label.textContent = view.label;
+    badge.dataset.state = view.state; badge.dataset.retained = String(view.retained); label.textContent = view.label;
     time.hidden = !sample;
-    time.textContent = sample ? new Intl.DateTimeFormat('fr-CH', { hour: '2-digit', minute: '2-digit' }).format(new Date(sample.checkedAt)) : '';
+    time.textContent = sample ? new Intl.DateTimeFormat('fr-CH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Zurich' }).format(new Date(sample.checkedAt)) : '';
     if (sample) time.dateTime = new Date(sample.checkedAt).toISOString(); else time.removeAttribute('datetime');
-    const checked = sample ? ` Dernier contrôle : ${new Intl.DateTimeFormat('fr-CH', { dateStyle: 'short', timeStyle: 'medium' }).format(new Date(sample.checkedAt))}.` : '';
+    const checked = sample ? ` Dernier contrôle : ${new Intl.DateTimeFormat('fr-CH', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Europe/Zurich' }).format(new Date(sample.checkedAt))}.` : '';
     const detail = sample?.applicationHttpStatus ? ` Page d’accès : HTTP ${sample.entryHttpStatus} vers Microsoft. Santé de l’application : HTTP ${sample.applicationHttpStatus}.` : '';
-    badge.title = `Contrôle externe de la page d’accès à l’intranet depuis GitHub, prévu toutes les 5 minutes.${detail}${checked} Le dashboard consulte le résultat chaque minute.`;
-    badge.setAttribute('aria-label', `État du site intranet : ${view.label}.${checked}`);
+    const retained = view.retained ? ` Dernier statut connu conservé${win.navigator?.onLine === false ? ' : navigateur hors ligne' : failed ? ' : actualisation indisponible' : ' : relevé ancien'}.` : '';
+    badge.title = `${view.description}.${retained}${checked}${detail} Contrôle externe depuis GitHub prévu toutes les 5 minutes, résultat lu chaque minute.`;
+    badge.setAttribute('aria-label', `Dernier état du site intranet : ${view.description}.${retained}${checked}`);
     if (sample && now() - sample.checkedAt <= HEALTH_MAX_AGE_MS) {
       expiry = schedule(render, Math.max(1, sample.checkedAt + HEALTH_MAX_AGE_MS - now() + 1)); expiry?.unref?.();
     }
@@ -34,7 +38,12 @@ export function initializeIntranetHealth(options = {}) {
       if (!response.ok) throw new Error('Availability feed unavailable');
       const next = parseIntranetHealth(await response.json(), now());
       if (disposed) return;
-      sample = next; failed = false; render();
+      if (!sample || next.checkedAt >= sample.checkedAt) {
+        sample = next;
+        try { storage?.setItem(INTRANET_HEALTH_CACHE_KEY, JSON.stringify({ ...sample, schemaVersion: 1, target: 'https://intranet.isp-spi.ch/intranet', checkedAt: new Date(sample.checkedAt).toISOString() })); }
+        catch { /* Keep the current page's last known result if storage is unavailable. */ }
+      }
+      failed = false; render();
     } catch { if (!disposed) { failed = true; render(); } }
     finally { cancel(timeout); busy = false; controller = null; }
   }
@@ -49,7 +58,7 @@ export function initializeIntranetHealth(options = {}) {
   win.addEventListener?.('offline', environmentChanged); win.addEventListener?.('online', environmentChanged);
   win.addEventListener?.('pageshow', environmentChanged); win.addEventListener?.('pagehide', pageHide);
   doc.addEventListener?.('visibilitychange', environmentChanged);
-  void refresh(); auto.start();
+  render(); void refresh(); auto.start();
   return { refresh, dispose };
 }
 if (typeof document !== 'undefined') initializeIntranetHealth();

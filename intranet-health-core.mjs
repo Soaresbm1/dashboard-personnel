@@ -1,5 +1,6 @@
 export const INTRANET_HEALTH_URL = 'https://raw.githubusercontent.com/Soaresbm1/dashboard-personnel/intranet-status/intranet-status.json';
 export const HEALTH_MAX_AGE_MS = 15 * 60_000;
+export const INTRANET_HEALTH_CACHE_KEY = 'dashboard.intranet-health.last.v1';
 const target = 'https://intranet.isp-spi.ch/intranet';
 const outcomes = ['online', 'http_error', 'auth_required', 'redirect', 'network_error'];
 export function parseIntranetHealth(raw, now = Date.now()) {
@@ -22,14 +23,16 @@ export function parseIntranetHealth(raw, now = Date.now()) {
     ...(hasApplicationCheck ? { entryHttpStatus: raw.entryHttpStatus, applicationHttpStatus: raw.applicationHttpStatus } : {}) };
 }
 export function intranetHealthView(sample, now = Date.now(), { feedUnavailable = false, offline = false } = {}) {
-  if (offline) return { state: 'unknown', label: 'Vérification hors ligne' };
-  if (!sample) return { state: 'unknown', label: 'État non vérifiable' };
-  if (now - sample.checkedAt > HEALTH_MAX_AGE_MS) return { state: 'unknown', label: 'Vérification ancienne' };
-  if (feedUnavailable) return { state: 'unknown', label: 'Contrôle indisponible' };
+  if (!sample) return { state: 'unknown', label: '—', description: 'Aucun statut connu', retained: false };
+  const retained = offline || feedUnavailable || now - sample.checkedAt > HEALTH_MAX_AGE_MS;
+  const result = (state, label, description) => ({ state, label, description, retained });
   const http = sample.httpStatus === null ? '' : ` · HTTP ${sample.httpStatus}`;
-  if (sample.outcome === 'online') return { state: 'online', label: `En ligne${http}` };
-  if (sample.outcome === 'auth_required') return { state: 'warning', label: `Accès protégé${http}` };
-  if (sample.outcome === 'redirect') return { state: 'warning', label: `Redirection${http}` };
-  if (sample.outcome === 'network_error') return { state: 'error', label: { timeout: 'Délai dépassé', dns: 'Erreur DNS', tls: 'Erreur TLS', network: 'Injoignable', redirect_loop: 'Boucle de redirection' }[sample.error] };
-  return { state: sample.httpStatus === 429 ? 'warning' : 'error', label: `${sample.httpStatus === 404 ? 'Page introuvable' : sample.httpStatus === 503 ? 'Indisponible' : 'Erreur'}${http}` };
+  if (sample.outcome === 'online') return result('online', 'En ligne', `En ligne${http}`);
+  if (sample.outcome === 'auth_required') return result('error', `HTTP ${sample.httpStatus}`, `Accès protégé${http}`);
+  if (sample.outcome === 'redirect') return result('error', `HTTP ${sample.httpStatus}`, `Redirection${http}`);
+  if (sample.outcome === 'network_error') {
+    const label = { timeout: 'Délai dépassé', dns: 'Erreur DNS', tls: 'Erreur TLS', network: 'Injoignable', redirect_loop: 'Redirection' }[sample.error];
+    return result('error', label, sample.error === 'redirect_loop' ? 'Boucle de redirection' : label);
+  }
+  return result('error', `HTTP ${sample.httpStatus}`, `${sample.httpStatus === 404 ? 'Page introuvable' : sample.httpStatus === 503 ? 'Indisponible' : 'Erreur'}${http}`);
 }

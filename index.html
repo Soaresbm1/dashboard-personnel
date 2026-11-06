@@ -90,16 +90,23 @@
             <p id="github-status" class="sr-only" role="status" aria-live="polite">Préparation du suivi GitHub…</p>
           </dd>
         </div>
+        <div id="summary-intranet-health" class="summary-item intranet-health-summary">
+          <dt>Intranet</dt>
+          <dd>
+            <span id="intranet-health" class="intranet-health" data-state="unknown" role="status" aria-live="polite">
+              <span class="health-symbol" aria-hidden="true"><svg class="icon health-online"><path d="m5 12 4 4L19 6"/></svg><svg class="icon health-error"><use href="#i-close"/></svg></span>
+              <span id="intranet-health-label">—</span>
+            </span>
+            <time id="intranet-health-time" class="health-checked" hidden></time>
+          </dd>
+        </div>
       </dl>
       <nav class="quick-access" aria-label="Accès rapides">
         <span class="quick-access-label">Accès rapides</span>
         <a href="https://outlook.office.com/mail/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Courrier Outlook <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
         <a href="https://outlook.office.com/calendar/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Calendrier <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
         <a href="https://teams.microsoft.com/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Teams <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
-        <span class="intranet-access">
-          <a href="https://intranet.isp-spi.ch/intranet" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Intranet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
-          <span id="intranet-health" class="intranet-health" data-state="unknown" role="status" aria-live="polite"><span class="health-dot" aria-hidden="true"></span><span id="intranet-health-label">Vérification…</span><time id="intranet-health-time" hidden></time></span>
-        </span>
+        <a href="https://intranet.isp-spi.ch/intranet" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Intranet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
         <span id="workplace-tools" class="workplace-tools">
           <button id="directory-open" type="button" aria-haspopup="dialog" aria-controls="directory-setup">Annuaire</button>
           <button id="rooms-open" type="button" aria-haspopup="dialog" aria-controls="rooms-setup">Salles <span id="rooms-summary" class="tool-summary">—</span></button>
