@@ -54,7 +54,7 @@ test('Old, unavailable and offline checks retain the last green or red result an
   for (const extra of [{ httpStatus: 503 }, { checkedAt: new Date(now + 180_000).toISOString() }, { target: 'https://example.test' }, { httpStatus: 0 }, { outcome: 'http_error' }]) assert.throws(() => parseIntranetHealth(sample(extra), now));
 });
 
-test('Frontend uses only the anonymous fixed feed, refreshes every minute, and replaces green with HTTP 503', async () => {
+test('Frontend uses only the anonymous server endpoint, refreshes every five minutes, and replaces green with HTTP 503', async () => {
   const nodes = new Map(['intranet-health', 'intranet-health-label', 'intranet-health-time'].map(id => [`#${id}`, { dataset: {}, textContent: '', setAttribute(k, v) { this[k] = v; }, removeAttribute(k) { delete this[k]; } }]));
   const events = new Map(), timers = new Map(), requests = [];
   let currentNow = now, mode = 'online', config, stopped = false, resolveLate, timerId = 0;
@@ -63,11 +63,12 @@ test('Frontend uses only the anonymous fixed feed, refreshes every minute, and r
   const service = initializeIntranetHealth({ document: doc, window: win, now: () => currentNow,
     setTimeout(fn, delay) { const id = ++timerId; timers.set(id, { fn, delay }); return id; }, clearTimeout: id => timers.delete(id),
     autoRefreshFactory(value) { config = value; return { start() {}, dispose() { stopped = true; } }; },
-    fetch: async (url, options) => { requests.push([url, options]); if (mode === 'late') return new Promise(resolve => { resolveLate = resolve; }); if (mode === 'failed') throw new Error('offline feed'); return new Response(JSON.stringify(sample(mode === '503' ? { outcome: 'http_error', httpStatus: 503 } : {}))); } });
+    fetch: async (url, options) => { requests.push([url, options]); if (mode === 'late') return new Promise(resolve => { resolveLate = resolve; }); if (mode === 'failed') throw new Error('offline feed'); return new Response(JSON.stringify(sample(mode === '503' ? { outcome: 'http_error', httpStatus: 503 } : mode === 'retained' ? { outcome: 'http_error', httpStatus: 503, checkFailed: true } : {}))); } });
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(nodes.get('#intranet-health').dataset.state, 'online'); assert.equal(config.intervalMs, 60_000);
+  assert.equal(nodes.get('#intranet-health').dataset.state, 'online'); assert.equal(config.intervalMs, 300_000);
   assert.equal(requests[0][0].split('?')[0], INTRANET_HEALTH_URL); assert.equal(requests[0][1].credentials, 'omit'); assert.equal(requests[0][1].headers, undefined);
   mode = '503'; await service.refresh(); assert.match(nodes.get('#intranet-health-label').textContent, /HTTP 503/); assert.equal(nodes.get('#intranet-health').dataset.state, 'error');
+  mode = 'retained'; await service.refresh(); assert.equal(nodes.get('#intranet-health').dataset.state, 'error'); assert.equal(nodes.get('#intranet-health-label').textContent, 'HTTP 503'); assert.equal(nodes.get('#intranet-health').dataset.retained, 'true'); assert.match(nodes.get('#intranet-health').title, /actualisation indisponible/);
   mode = 'online'; await service.refresh(); currentNow += HEALTH_MAX_AGE_MS + 1; [...timers.values()].at(-1).fn(); assert.equal(nodes.get('#intranet-health').dataset.state, 'online'); assert.match(nodes.get('#intranet-health').title, /relevé ancien/);
   currentNow = now; mode = 'failed'; await service.refresh(); assert.equal(nodes.get('#intranet-health').dataset.state, 'online'); assert.match(nodes.get('#intranet-health').title, /actualisation indisponible/);
   win.navigator.onLine = false; events.get('offline')(); assert.equal(nodes.get('#intranet-health').dataset.state, 'online'); assert.match(nodes.get('#intranet-health').title, /hors ligne/);
