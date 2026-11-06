@@ -1,4 +1,5 @@
-export const INTRANET_HEALTH_URL = 'https://raw.githubusercontent.com/Soaresbm1/dashboard-personnel/intranet-status/intranet-status.json';
+export const INTRANET_HEALTH_URL = 'https://intranet.isp-spi.ch/dashboard-intranet-status.php';
+export const HEALTH_INTERVAL_MS = 5 * 60_000;
 export const HEALTH_MAX_AGE_MS = 15 * 60_000;
 export const INTRANET_HEALTH_CACHE_KEY = 'dashboard.intranet-health.last.v1';
 const target = 'https://intranet.isp-spi.ch/intranet';
@@ -6,7 +7,8 @@ const outcomes = ['online', 'http_error', 'auth_required', 'redirect', 'network_
 export function parseIntranetHealth(raw, now = Date.now()) {
   const checkedAt = typeof raw?.checkedAt === 'string' ? Date.parse(raw.checkedAt) : NaN;
   if (raw?.schemaVersion !== 1 || raw.target !== target || !Number.isFinite(checkedAt) || checkedAt > now + 120_000
-    || !outcomes.includes(raw.outcome) || !Number.isFinite(raw.latencyMs) || raw.latencyMs < 0 || raw.latencyMs > 120_000) throw new Error('Invalid availability result');
+    || !outcomes.includes(raw.outcome) || !Number.isFinite(raw.latencyMs) || raw.latencyMs < 0 || raw.latencyMs > 120_000
+    || (raw.checkFailed !== undefined && typeof raw.checkFailed !== 'boolean')) throw new Error('Invalid availability result');
   const status = raw.httpStatus;
   if (raw.outcome === 'network_error') {
     if (status !== null || !['timeout', 'dns', 'tls', 'network', 'redirect_loop'].includes(raw.error)) throw new Error('Invalid network result');

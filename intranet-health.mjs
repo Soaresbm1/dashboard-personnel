@@ -1,5 +1,5 @@
 import { createAutoRefresh } from './auto-refresh.mjs';
-import { INTRANET_HEALTH_URL, INTRANET_HEALTH_CACHE_KEY, HEALTH_MAX_AGE_MS, parseIntranetHealth, intranetHealthView } from './intranet-health-core.mjs';
+import { INTRANET_HEALTH_URL, INTRANET_HEALTH_CACHE_KEY, HEALTH_INTERVAL_MS, HEALTH_MAX_AGE_MS, parseIntranetHealth, intranetHealthView } from './intranet-health-core.mjs';
 
 export function initializeIntranetHealth(options = {}) {
   const doc = options.document || globalThis.document, win = options.window || globalThis.window;
@@ -22,7 +22,7 @@ export function initializeIntranetHealth(options = {}) {
     const checked = sample ? ` Dernier contrôle : ${new Intl.DateTimeFormat('fr-CH', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Europe/Zurich' }).format(new Date(sample.checkedAt))}.` : '';
     const detail = sample?.applicationHttpStatus ? ` Page d’accès : HTTP ${sample.entryHttpStatus} vers Microsoft. Santé de l’application : HTTP ${sample.applicationHttpStatus}.` : '';
     const retained = view.retained ? ` Dernier statut connu conservé${win.navigator?.onLine === false ? ' : navigateur hors ligne' : failed ? ' : actualisation indisponible' : ' : relevé ancien'}.` : '';
-    badge.title = `${view.description}.${retained}${checked}${detail} Contrôle externe depuis GitHub prévu toutes les 5 minutes, résultat lu chaque minute.`;
+    badge.title = `${view.description}.${retained}${checked}${detail} Contrôle côté serveur toutes les 5 minutes lorsque le dashboard est affiché, puis à son retour après une pause.`;
     badge.setAttribute('aria-label', `Dernier état du site intranet : ${view.description}.${retained}${checked}`);
     if (sample && now() - sample.checkedAt <= HEALTH_MAX_AGE_MS) {
       expiry = schedule(render, Math.max(1, sample.checkedAt + HEALTH_MAX_AGE_MS - now() + 1)); expiry?.unref?.();
@@ -31,23 +31,24 @@ export function initializeIntranetHealth(options = {}) {
   async function refresh() {
     if (disposed || busy || doc.hidden || win.navigator?.onLine === false) return;
     busy = true; lastAttempt = now(); controller = new AbortController();
-    const request = controller, timeout = schedule(() => request.abort(), 10_000);
+    const request = controller, timeout = schedule(() => request.abort(), 20_000);
     try {
-      const response = await fetcher(`${INTRANET_HEALTH_URL}?v=${Math.floor(now() / 60_000)}`, {
+      const response = await fetcher(`${INTRANET_HEALTH_URL}?v=${Math.floor(now() / HEALTH_INTERVAL_MS)}`, {
         signal: request.signal, credentials: 'omit', cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer' });
       if (!response.ok) throw new Error('Availability feed unavailable');
-      const next = parseIntranetHealth(await response.json(), now());
+      const raw = await response.json();
+      const next = parseIntranetHealth(raw, now());
       if (disposed) return;
       if (!sample || next.checkedAt >= sample.checkedAt) {
         sample = next;
         try { storage?.setItem(INTRANET_HEALTH_CACHE_KEY, JSON.stringify({ ...sample, schemaVersion: 1, target: 'https://intranet.isp-spi.ch/intranet', checkedAt: new Date(sample.checkedAt).toISOString() })); }
         catch { /* Keep the current page's last known result if storage is unavailable. */ }
       }
-      failed = false; render();
+      failed = raw.checkFailed === true; render();
     } catch { if (!disposed) { failed = true; render(); } }
     finally { cancel(timeout); busy = false; controller = null; }
   }
-  const auto = (options.autoRefreshFactory || createAutoRefresh)({ document: doc, window: win, intervalMs: 60_000,
+  const auto = (options.autoRefreshFactory || createAutoRefresh)({ document: doc, window: win, intervalMs: HEALTH_INTERVAL_MS,
     refresh, canRefresh: () => !busy, lastAttemptAt: () => lastAttempt });
   function environmentChanged() { if (!disposed) render(); }
   function pageHide(event) { if (!event.persisted) dispose(); }
@@ -58,7 +59,9 @@ export function initializeIntranetHealth(options = {}) {
   win.addEventListener?.('offline', environmentChanged); win.addEventListener?.('online', environmentChanged);
   win.addEventListener?.('pageshow', environmentChanged); win.addEventListener?.('pagehide', pageHide);
   doc.addEventListener?.('visibilitychange', environmentChanged);
-  render(); void refresh(); auto.start();
+  // Start the interval after the initial request so the server's five-minute
+  // cache has expired when the next automatic check arrives.
+  render(); void refresh().finally(() => { if (!disposed) auto.start(); });
   return { refresh, dispose };
 }
 if (typeof document !== 'undefined') initializeIntranetHealth();
