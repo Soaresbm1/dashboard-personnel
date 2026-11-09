@@ -10,6 +10,16 @@ Sur ordinateur, le résumé et les accès rapides précèdent une grille unique 
 
 À partir de 1040 × 650 pixels utiles, les quatre panneaux et leurs actions tiennent dans la hauteur de l’écran. Seules les listes longues défilent à l’intérieur de leur panneau, avec accès au clavier. Les éléments des listes chargées restent accessibles. Sur petit écran, après zoom ou en présence d’un message d’erreur, la page peut s’allonger pour conserver une lecture complète.
 
+## Benfica
+
+Le bandeau du résumé affiche les trois prochains matchs de l’équipe première masculine du Benfica, toutes compétitions, entre la météo et GitHub. Chaque ligne présente les deux équipes dans l’ordre domicile–extérieur, la date, l’heure en `Europe/Zurich` et la compétition. Un horaire provisoire reste « horaire à confirmer » ; les matchs commencés, terminés, annulés ou reportés ne sont pas présentés comme de prochains matchs programmés.
+
+Les données proviennent du [calendrier public ESPN](https://www.espn.com/soccer/team/fixtures/_/id/1929/benfica), via une requête GET sans clé ni identifiants sur `https://site.api.espn.com/apis/site/v2/sports/soccer/all/teams/1929/schedule?fixture=true`. Le calendrier est actualisé toutes les 15 minutes lorsque le dashboard est visible et en ligne, ainsi qu’au retour sur la page si l’intervalle est écoulé. Aucun rendez-vous Outlook n’est créé. Les liens de détail sont limités aux pages de match HTTPS d’ESPN.
+
+Seules les données sportives publiques sont mises en cache dans ce navigateur, pendant sept jours au maximum. En cas de panne de la source, les prochaines rencontres déjà reçues restent visibles avec la date du dernier relevé. Les rencontres déjà commencées sont retirées chaque minute même hors ligne. Le bloc fonctionne indépendamment de la connexion Microsoft.
+
+Validation : `npm run test:benfica` couvre la sélection des rencontres, les changements d’heure, les horaires provisoires, les liens, le cache, les erreurs réseau et la reprise après panne.
+
 ## Courrier, accès rapides et actualités internes
 
 Le courrier affiche automatiquement uniquement les mails non lus de la boîte de réception (jusqu’aux cinq plus récents). Dès qu’aucun mail non lu ne reste, il affiche les cinq derniers mails reçus. Cette sélection est réévaluée à chaque actualisation automatique, chaque minute ; aucun bouton de filtre n’est nécessaire. Le compteur du titre indique toujours le nombre total de non-lus de la boîte de réception. Les requêtes Microsoft Graph utilisent uniquement `Mail.ReadBasic` déléguée et sélectionnent les sujets, expéditeurs, dates, importance, état lu/non lu et liens Outlook. Aucun corps, aperçu du corps ou pièce jointe n’est demandé. Ouvrir un lien conduit dans Outlook ; le dashboard n’envoie ni ne modifie aucun mail.

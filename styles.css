@@ -143,12 +143,23 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .news-item-content.is-rich > :last-child { margin-bottom: 0; }
 .mail-item.is-important .mail-item-subject { font-weight: 600; }
 .panel-header h2 .item-count { margin-left: 6px; vertical-align: middle; }
-.summary-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.65fr) minmax(0, .9fr) minmax(0, 1.5fr) 104px; flex-shrink: 0; margin: 0; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.summary-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.65fr) minmax(0, .9fr) minmax(0, 1.35fr) minmax(0, 1.5fr) 104px; flex-shrink: 0; margin: 0; padding: 11px 0; border-bottom: 1px solid var(--line); }
 .summary-item { min-width: 0; padding: 0 20px; }
 .summary-item:first-child { padding-left: 0; }
 .summary-item + .summary-item { border-left: 1px solid var(--line); }
 .summary-item dt { color: var(--muted); font-size: 11px; line-height: 1.6; }
 .summary-item dd { margin: 0; }
+.benfica-summary dt { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.benfica-summary dt > span { color: #a13a4c; font-weight: 600; }
+.benfica-count { color: var(--muted); font-size: 9px; font-weight: 400; }
+.benfica-summary dt > a { font-size: 9px; text-decoration: underline; text-underline-offset: 3px; }
+.benfica-matches { list-style: none; margin: 3px 0 0; padding: 0; }
+.benfica-match { min-width: 0; padding: 3px 0; }
+.benfica-match + .benfica-match { border-top: 1px solid var(--line); }
+.benfica-match a, .benfica-match strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 500; line-height: 1.4; }
+.benfica-match-detail { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 9px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.benfica-empty, .benfica-warning { color: var(--muted); font-size: 10px; line-height: 1.5; }
+.benfica-warning { margin-top: 4px; }
 .summary-value { display: block; margin-top: 3px; font-size: 22px; font-weight: 600; letter-spacing: -.5px; line-height: 1.2; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .summary-detail { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #github-repository { width: 100%; max-width: 100%; min-width: 0; padding: 0 18px 0 0; border: 0; background-color: transparent; color: var(--ink); font: inherit; font-size: 11px; font-weight: 600; text-overflow: ellipsis; }
@@ -325,8 +336,11 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
   .summary-item:first-child { order: 1; }
   .summary-item.weather-summary { order: 2; grid-column: 2; }
   .summary-item.transport-summary { order: 3; grid-column: 1 / -1; border-left: 0; padding-left: 0; }
-  .summary-item.github-summary { order: 4; grid-column: 1; border-left: 0; padding-left: 0; }
-  .summary-item.intranet-health-summary { order: 5; grid-column: 2; }
+  .summary-item.benfica-summary { order: 4; grid-column: 1 / -1; border-left: 0; padding-left: 0; }
+  .benfica-matches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .benfica-match + .benfica-match { border-top: 0; }
+  .summary-item.github-summary { order: 5; grid-column: 1; border-left: 0; padding-left: 0; }
+  .summary-item.intranet-health-summary { order: 6; grid-column: 2; }
 }
 @media (max-width: 520px) {
   .topbar-right { gap: 12px; }
@@ -347,8 +361,9 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
   .summary-item { padding: 11px 0; }
   .summary-item:first-child { order: 1; border-bottom: 1px solid var(--line); }
   .summary-item.transport-summary { order: 3; grid-column: 1 / -1; border-left: 0; }
-  .summary-item.github-summary { order: 4; grid-column: 1; padding-right: 12px; border-left: 0; border-top: 1px solid var(--line); }
-  .summary-item.intranet-health-summary { order: 5; grid-column: 2; padding: 11px 0 11px 12px; border-top: 1px solid var(--line); }
+  .summary-item.benfica-summary { order: 4; grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); }
+  .summary-item.github-summary { order: 5; grid-column: 1; padding-right: 12px; border-left: 0; border-top: 1px solid var(--line); }
+  .summary-item.intranet-health-summary { order: 6; grid-column: 2; padding: 11px 0 11px 12px; border-top: 1px solid var(--line); }
   .github-summary #github-refresh { width: 36px; height: 36px; }
   .summary-item.weather-summary { order: 2; grid-column: 2; padding-left: 18px; border-bottom: 1px solid var(--line); }
   .weather-summary dt { display: block; }
