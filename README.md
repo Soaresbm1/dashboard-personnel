@@ -20,6 +20,16 @@ Seules les données sportives publiques sont mises en cache dans ce navigateur, 
 
 Validation : `npm run test:benfica` couvre la sélection des rencontres, les changements d’heure, les horaires provisoires, les liens, le cache, les erreurs réseau et la reprise après panne.
 
+## FC Le Locle · Juniors A
+
+Le bloc football regroupe Benfica et les trois prochains matchs du FC Le Locle Juniors A, équipe ANF `34107` du club `919`, sans élargir le bandeau à sept colonnes. Les équipes et les dates restent visibles dans deux petites colonnes, en heure suisse. Les compétitions, coupes et matchs d’entraînement présents dans le calendrier officiel de cette équipe sont pris en compte.
+
+Le [calendrier officiel ANF](https://matchcenter-anf.football.ch/default.aspx?a=pt&lng=2&oid=15&t=34107&v=919) est lu via son flux iCalendar. Comme ce flux ne propose pas CORS, un relais PHP autonome, à URL source fixe, fournit uniquement ces données sportives publiques. Le fichier `server/dashboard-lelocle-fixtures.php` doit être installé sur l’hébergement PHP, dans le répertoire public, à l’adresse configurée dans `lelocle-core.mjs`. Il utilise un cache privé et un verrou pour limiter la source à une tentative toutes les quinze minutes, sans dépendre de Laravel, de Microsoft, d’un compte ou d’un jeton. Aucune URL fournie par le client n’est utilisée.
+
+Un calendrier officiel vide produit « Aucun prochain match annoncé ». Une erreur réseau, une page HTML ou un calendrier d’une autre équipe produisent un état indisponible, ou conservent le dernier relevé valide avec sa date. Le relais et le navigateur conservent l’horodatage original en cas de panne. Le navigateur retire les matchs commencés chaque minute et conserve au maximum sept jours de données sportives publiques. Les horaires à déterminer, dates seules et heures ambiguës au changement d’heure sont explicitement provisoires. Aucun événement Outlook n’est créé.
+
+Validation : `npm run test:lelocle` pour les flux ICS et le comportement du bloc ; `npm run test:benfica` vérifie aussi le moteur d’affichage partagé. Le relais PHP dispose d’un test isolé exécuté avant son installation sur le serveur : `php server/tests/lelocle-proxy.test.php server/dashboard-lelocle-fixtures.php`.
+
 ## Courrier, accès rapides et actualités internes
 
 Le courrier affiche automatiquement uniquement les mails non lus de la boîte de réception (jusqu’aux cinq plus récents). Dès qu’aucun mail non lu ne reste, il affiche les cinq derniers mails reçus. Cette sélection est réévaluée à chaque actualisation automatique, chaque minute ; aucun bouton de filtre n’est nécessaire. Le compteur du titre indique toujours le nombre total de non-lus de la boîte de réception. Les requêtes Microsoft Graph utilisent uniquement `Mail.ReadBasic` déléguée et sélectionnent les sujets, expéditeurs, dates, importance, état lu/non lu et liens Outlook. Aucun corps, aperçu du corps ou pièce jointe n’est demandé. Ouvrir un lien conduit dans Outlook ; le dashboard n’envoie ni ne modifie aucun mail.

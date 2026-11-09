@@ -21,6 +21,7 @@
   <script src="github.mjs" type="module"></script>
   <script src="intranet-health.mjs" type="module"></script>
   <script src="benfica.mjs" type="module"></script>
+  <script src="lelocle.mjs" type="module"></script>
 </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:none">
@@ -73,9 +74,18 @@
           <dt><span>Météo · Neuchâtel</span><a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" class="weather-source" aria-label="Source météo : Open-Meteo">Open-Meteo</a></dt>
           <dd><span class="summary-value weather-value"><span id="weather-temperature">—</span><span id="weather-condition" class="weather-condition"></span></span><span id="weather-detail" class="summary-detail">Chargement de la météo…</span><span id="weather-status" class="sr-only" role="status" aria-live="polite">Chargement de la météo de Neuchâtel.</span></dd>
         </div>
-        <div id="summary-benfica" class="summary-item benfica-summary" data-state="loading">
-          <dt><span>Benfica <span class="benfica-count">· 3 prochains</span></span><a href="https://www.espn.com/soccer/team/fixtures/_/id/1929/benfica" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" aria-label="Calendrier du Benfica, source ESPN">ESPN</a></dt>
-          <dd><ol id="benfica-matches" class="benfica-matches" aria-label="Les trois prochains matchs du Benfica, heures suisses" aria-busy="true"><li class="benfica-empty">Chargement des matchs…</li></ol><p id="benfica-status" class="sr-only" role="status" aria-live="polite">Chargement du calendrier du Benfica.</p><p id="benfica-warning" class="benfica-warning" hidden></p></dd>
+        <div id="summary-football" class="summary-item sports-summary">
+          <dt class="sr-only">Football</dt>
+          <dd class="sports-clubs">
+            <dl id="summary-benfica" class="benfica-summary" data-state="loading">
+              <dt><span>Benfica <span class="benfica-count">· 3 prochains</span></span><a href="https://www.espn.com/soccer/team/fixtures/_/id/1929/benfica" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" aria-label="Calendrier du Benfica, source ESPN">ESPN</a></dt>
+              <dd><ol id="benfica-matches" class="benfica-matches" aria-label="Les trois prochains matchs du Benfica, heures suisses" aria-busy="true"><li class="benfica-empty">Chargement des matchs…</li></ol><p id="benfica-status" class="sr-only" role="status" aria-live="polite">Chargement du calendrier du Benfica.</p><p id="benfica-warning" class="benfica-warning" hidden></p></dd>
+            </dl>
+          <dl id="summary-lelocle" class="lelocle-summary" data-state="loading">
+            <dt><span title="FC Le Locle · Juniors A">FC Le Locle <span class="benfica-count">· A</span></span><a href="https://matchcenter-anf.football.ch/default.aspx?a=pt&amp;lng=2&amp;oid=15&amp;t=34107&amp;v=919" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" aria-label="Calendrier officiel du FC Le Locle Juniors A, Association neuchâteloise de football">ANF</a></dt>
+            <dd><ol id="lelocle-matches" class="benfica-matches" aria-label="Les trois prochains matchs du FC Le Locle Juniors A, heures suisses" aria-busy="true"><li class="benfica-empty">Chargement des matchs…</li></ol><p id="lelocle-status" class="sr-only" role="status" aria-live="polite">Chargement du calendrier du FC Le Locle Juniors A.</p><p id="lelocle-warning" class="benfica-warning" hidden></p></dd>
+          </dl>
+          </dd>
         </div>
         <div id="github-overview" class="summary-item github-summary" role="region" aria-labelledby="github-title" aria-busy="false">
           <dt><span id="github-title">GitHub <a class="github-account-link" href="https://github.com/Soaresbm1?tab=repositories" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Soaresbm1</a></span><button id="github-refresh" type="button" class="icon-button" aria-label="Actualiser le suivi GitHub" title="GitHub · actualisation automatique toutes les 5 minutes" hidden><svg class="icon" aria-hidden="true"><use href="#i-reset"/></svg></button></dt>
