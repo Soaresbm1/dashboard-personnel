@@ -1,7 +1,8 @@
 import { createAutoRefresh } from './auto-refresh.mjs';
 
 export function initializeFootballFixtures(settings, options = {}) {
-  const { prefix, label, sourceName, url, intervalMs, cacheKey, cacheMaxAgeMs, readCache, readSchedule, selectUpcoming, formatWhen } = settings;
+  const { prefix, label, sourceName, url, intervalMs, cacheKey, cacheMaxAgeMs, readCache, readSchedule, selectUpcoming, formatWhen,
+    selectView, mergeSnapshot = (_, next) => next, mergeExternalSnapshot, requestTimeoutMs = 12_000 } = settings;
   const doc = options.document || globalThis.document, win = options.window || globalThis.window;
   const get = id => doc.getElementById(id), summary = get(`summary-${prefix}`);
   if (!summary) return null;
@@ -13,41 +14,55 @@ export function initializeFootballFixtures(settings, options = {}) {
 
   function render(stale = false) {
     if (lastGood && now() - lastGood.at > cacheMaxAgeMs) lastGood = null;
-    const matches = lastGood ? selectUpcoming(lastGood.matches, now()) : [];
-    summary.dataset.state = lastGood ? stale ? 'stale' : 'ready' : inFlight ? 'loading' : 'unavailable';
-    const signature = JSON.stringify({ matches, empty: matches.length ? '' : lastGood ? 'empty' : inFlight ? 'loading' : 'unavailable' });
+    const view = lastGood && selectView ? selectView(lastGood, now()) : { matches: lastGood ? selectUpcoming(lastGood.matches, now()) : [], mode: 'upcoming', at: lastGood?.at };
+    const matches = view.matches, retained = stale || view.stale === true, available = !!lastGood && view.available !== false;
+    summary.dataset.state = available ? retained ? 'stale' : 'ready' : inFlight ? 'loading' : 'unavailable';
+    summary.dataset.mode = view.mode;
+    const modeLabel = view.mode === 'results' ? 'Derniers résultats' : 'Prochains matchs';
+    const mode = get(`${prefix}-mode`);
+    if (mode && mode.textContent !== modeLabel) mode.textContent = modeLabel;
+    get(`${prefix}-matches`).setAttribute('aria-label', `Les trois ${view.mode === 'results' ? 'derniers résultats' : 'prochains matchs'} — ${label}`);
+    const signature = JSON.stringify({ matches, mode: view.mode, empty: matches.length ? '' : available ? 'empty' : inFlight ? 'loading' : 'unavailable' });
     if (signature !== renderedSignature) {
       const fragment = doc.createDocumentFragment();
       for (const match of matches) {
         const row = doc.createElement('li'); row.className = 'benfica-match';
-        const teams = `${match.home} – ${match.away}`, when = formatWhen(match);
-        const title = doc.createElement(match.url ? 'a' : 'strong'); title.textContent = teams;
-        title.title = `${teams} · ${when} (heure suisse) · ${match.league}`;
+        const result = view.mode === 'results';
+        const teams = `${match.home} – ${match.away}`, when = result ? new Intl.DateTimeFormat('fr-CH', { timeZone: 'Europe/Zurich', day: 'numeric', month: 'short' }).format(new Date(match.startsAt)) : formatWhen(match);
+        const title = doc.createElement(match.url ? 'a' : 'strong');
+        if (result) {
+          row.className += ' football-result'; title.className = 'football-match-heading';
+          const names = doc.createElement('span'); names.textContent = teams;
+          const score = doc.createElement('span'); score.className = 'football-score'; score.textContent = `${match.scoreHome}–${match.scoreAway}`;
+          title.append(names, score);
+        } else title.textContent = teams;
+        title.title = `${teams}${result ? ` · ${match.scoreHome}–${match.scoreAway}` : ''} · ${when}${result ? '' : ' (heure suisse)'} · ${match.league}`;
         if (match.url) { title.href = match.url; title.target = '_blank'; title.rel = 'noopener noreferrer'; title.referrerPolicy = 'no-referrer'; title.setAttribute('aria-label', `${title.title} — détails sur ${sourceName} (nouvel onglet)`); }
         const detail = doc.createElement('span'); detail.className = 'benfica-match-detail'; detail.textContent = `${when} · ${match.league}`; detail.title = `${detail.textContent} · Europe/Zurich`;
         row.append(title, detail); fragment.append(row);
       }
       if (!matches.length) {
         const empty = doc.createElement('li'); empty.className = 'benfica-empty';
-        empty.textContent = lastGood ? 'Aucun prochain match annoncé.' : inFlight ? 'Chargement des matchs…' : 'Calendrier indisponible · réessai automatique';
+        empty.textContent = available ? view.mode === 'results' ? 'Aucun résultat publié.' : 'Aucun prochain match annoncé.' : inFlight ? 'Chargement des matchs…' : view.mode === 'results' ? 'Résultats indisponibles · réessai automatique' : 'Calendrier indisponible · réessai automatique';
         fragment.append(empty);
       }
       get(`${prefix}-matches`).replaceChildren(fragment);
       renderedSignature = signature;
     }
     get(`${prefix}-matches`).setAttribute('aria-busy', String(inFlight));
-    const updated = lastGood ? new Intl.DateTimeFormat('fr-CH', { timeZone: 'Europe/Zurich', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(lastGood.at)) : '';
-    get(`${prefix}-warning`).hidden = !stale || !lastGood;
-    get(`${prefix}-warning`).textContent = stale && lastGood ? `Dernières données : ${updated}` : '';
-    summary.title = `${label} · heures suisses · actualisation toutes les ${intervalMs / 60_000} minutes` + (lastGood ? ` · relevé du ${updated}` : '');
-    const status = lastGood ? `${matches.length} prochain${matches.length > 1 ? 's' : ''} match${matches.length > 1 ? 's' : ''} — ${label}. Heures suisses. ${stale ? 'Actualisation indisponible ; dernières données' : 'Actualisé'} le ${updated}.` : `Le calendrier de ${label} est indisponible. Nouvelle tentative automatique.`;
+    const updated = available ? new Intl.DateTimeFormat('fr-CH', { timeZone: 'Europe/Zurich', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(view.at ?? lastGood.at)) : '';
+    get(`${prefix}-warning`).hidden = !retained || !available;
+    get(`${prefix}-warning`).textContent = retained && available ? `Dernières données : ${updated}` : '';
+    summary.title = `${label} · heures suisses · actualisation toutes les ${intervalMs / 60_000} minutes` + (available ? ` · relevé du ${updated}` : '');
+    const plural = matches.length > 1 ? 's' : '';
+    const status = available ? `${matches.length} ${view.mode === 'results' ? `résultat${plural}` : `prochain${plural} match${plural}`} — ${label}. Heures suisses. ${retained ? 'Actualisation indisponible ; dernières données' : 'Actualisé'} le ${updated}.` : `${view.mode === 'results' ? 'Les résultats' : 'Le calendrier'} de ${label} ${view.mode === 'results' ? 'sont indisponibles' : 'est indisponible'}. Nouvelle tentative automatique.`;
     if (get(`${prefix}-status`).textContent !== status) get(`${prefix}-status`).textContent = status;
   }
 
   async function refresh() {
     if (disposed || inFlight || doc.hidden || win.navigator?.onLine === false) return;
     inFlight = true; lastAttemptAt = now(); controller = new AbortController();
-    const timeout = setTimeout(() => controller?.abort(), 12_000);
+    const timeout = setTimeout(() => controller?.abort(), requestTimeoutMs);
     get(`${prefix}-matches`).setAttribute('aria-busy', 'true');
     if (!lastGood) render(false);
     try {
@@ -55,7 +70,7 @@ export function initializeFootballFixtures(settings, options = {}) {
       if (!response.ok) throw new Error('Football schedule request failed');
       const snapshot = await readSchedule(response, now());
       if (disposed) return;
-      lastGood = { at: snapshot.at, matches: snapshot.matches };
+      lastGood = mergeSnapshot(lastGood, snapshot, now());
       stale = snapshot.stale === true;
       try { storage?.setItem(cacheKey, JSON.stringify({ version: 1, ...lastGood })); } catch { /* Optional public-fixture cache. */ }
       render(stale);
@@ -85,6 +100,13 @@ export function initializeFootballFixtures(settings, options = {}) {
   tick = setInterval(() => { if (!disposed && !doc.hidden) render(stale || !!lastGood && now() - lastGood.at >= intervalMs); }, 60_000);
   tick?.unref?.();
   render(!!lastGood); void refresh(); auto.start();
-  return { refresh, dispose };
+  return { refresh, dispose, applyExternalSnapshot(packet) {
+    if (disposed || !lastGood || !mergeExternalSnapshot) return;
+    const next = mergeExternalSnapshot(lastGood, packet, now());
+    if (!next || next === lastGood) return;
+    lastGood = next;
+    try { storage?.setItem(cacheKey, JSON.stringify({ version: 1, ...lastGood })); } catch { /* Optional public cache. */ }
+    render(stale);
+  } };
 }
 

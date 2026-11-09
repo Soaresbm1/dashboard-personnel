@@ -1,0 +1,9 @@
+{
+  "extensionId": "alepjbcpdhcadcbggjgelichkenlmepc",
+  "protocol": "dashboard-football-v1",
+  "commands": [
+    "GET_RESULTS",
+    "REFRESH_RESULTS"
+  ],
+  "version": "1.0.0"
+}
