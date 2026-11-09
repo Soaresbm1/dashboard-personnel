@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Dashboard · Football ANF",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Lecture locale des résultats publics du FC Le Locle Juniors A pour le dashboard.",
   "minimum_chrome_version": "120",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqzWKtv8KMYfjcddrS9j7U8Ts9V/fqZ8VTQTKEVKzYLI+LaXvzABGfOcls5pGxvplS4ejewV5qYklKcR1oND60U6SArOT2ADd2Lc5eN9wB+vh/1dyLBPqa57if9XTwkFziRMRTEfpc9vkQrxY1X/bxf3Z6lhcg/NJENQ8BVz/Q5CDtAybnzDjWOp0PCZv7jgQGh9nKn+w94aVEnr/gwK9tXuec40l65nJQERGurxAe63T7V9MHjVkX61YWKVtblWZxKt7o2+Z1i9dF0Ef8Jhj7cIg992yX+i55jbuDpWE6ZHpAWcDCjnNLrSxHZccftd3+mFhkfPtDneVlUF23GZylwIDAQAB",

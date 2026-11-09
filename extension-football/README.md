@@ -6,14 +6,16 @@ Cette extension Edge lit les trois derniers scores publics du **FC Le Locle · J
 
 1. Ouvrir `edge://extensions` et activer **Mode développeur**.
 2. Cliquer sur **Charger l’extension décompressée** et sélectionner ce dossier : `extension-football`.
-3. Vérifier que la carte **Dashboard · Football ANF**, version **1.0.0**, est activée.
+3. Vérifier que la carte **Dashboard · Football ANF**, version **1.0.1**, est activée. Pour mettre à jour une installation existante, cliquer sur **Recharger** sur cette carte.
 4. Recharger le [dashboard](https://soaresbm1.github.io/dashboard-personnel/) dans le même profil Edge.
 
 L’ID attendu est `alepjbcpdhcadcbggjgelichkenlmepc`. La clé publique du manifeste stabilise cet ID lorsque le dossier est déplacé ou l’extension rechargée.
 
 ## Fonctionnement
 
-Toutes les quinze minutes, lorsque Edge est lancé, l’extension ouvre son propre onglet inactif sur le [calendrier des Juniors A](https://matchcenter-anf.football.ch/default.aspx?a=pt&lng=2&oid=15&t=34107&v=919). Elle attend la page complète, vérifie l’équipe et lit les scores présents dans le tableau de matchs. Une rencontre est retenue seulement si les deux scores sont numériques et si son coup d’envoi remonte à au moins trois heures. Les trois résultats sont triés du plus récent au plus ancien.
+Tous les cinq jours, lorsque Edge est lancé, l’extension ouvre son propre onglet inactif sur le [calendrier des Juniors A](https://matchcenter-anf.football.ch/default.aspx?a=pt&lng=2&oid=15&t=34107&v=919). Elle attend la page complète, vérifie l’équipe et lit les scores présents dans le tableau de matchs. Une rencontre est retenue seulement si les deux scores sont numériques et si son coup d’envoi remonte à au moins trois heures. Les trois résultats sont triés du plus récent au plus ancien.
+
+La mise à jour remplace l’ancienne programmation de quinze minutes et conserve la date de la dernière tentative. Le redémarrage d’Edge ou l’ouverture du dashboard ne déclenche pas de nouvelle lecture avant les cinq jours. Si Edge était fermé à l’échéance, une seule vérification de rattrapage est lancée à son prochain démarrage. Une lecture manuelle reste possible et reporte la prochaine vérification automatique à cinq jours après cette tentative. Les dernières données valides sont conservées entre deux contrôles et en cas d’échec.
 
 L’onglet se ferme après la lecture s’il est resté en arrière-plan. Si vous l’avez sélectionné ou si vous avez changé sa page, il reste ouvert. La tentative expire au bout de 90 secondes. Un blocage de la page ou une lecture incomplète conserve les dernières données valides avec leur date d’origine.
 
@@ -36,12 +38,12 @@ chrome.runtime.sendMessage('alepjbcpdhcadcbggjgelichkenlmepc', {
 });
 ```
 
-`GET_RESULTS` renvoie immédiatement le dernier relevé et lance une lecture en arrière-plan si les quinze minutes sont écoulées. `REFRESH_RESULTS` demande une lecture manuelle, avec un délai minimal de trente secondes.
+`GET_RESULTS` renvoie immédiatement le dernier relevé et lance une lecture en arrière-plan si les cinq jours sont écoulés. `REFRESH_RESULTS` demande une lecture manuelle, avec un délai minimal de trente secondes.
 
 Réponse :
 
 ```text
-{ installed:true, protocol:'dashboard-football-v1', version:'1.0.0',
+{ installed:true, protocol:'dashboard-football-v1', version:'1.0.1',
   resultsState:'ready'|'unavailable', results:[],
   resultsCheckedAt:ISO_UTC|null, resultsCheckFailed:boolean, refreshing:boolean }
 ```

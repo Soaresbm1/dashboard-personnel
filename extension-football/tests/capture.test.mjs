@@ -41,7 +41,7 @@ test('GET responds with cached state immediately and creates only one inactive f
   const value = await h.manager.external({ type: 'GET_RESULTS' }, dashboard);
   assert.equal(value.results[0].scoreHome, 0); assert.equal(value.resultsCheckFailed, false); assert.equal(value.refreshing, false);
   assert.equal(value.resultsCheckedAt, new Date(NOW).toISOString());
-  assert.equal(h.alarms.get(PERIODIC_ALARM).periodInMinutes, 15);
+  assert.equal(h.alarms.get(PERIODIC_ALARM).periodInMinutes, 7_200);
 });
 
 test('A user-activated tab is preserved even after becoming inactive again', async () => {
@@ -96,11 +96,57 @@ test('A valid capture can complete after worker restart and successful empty dat
   assert.equal(value.resultsState, 'ready'); assert.deepEqual(value.results, []); assert.equal(value.resultsCheckFailed, false);
 });
 
-test('Manual refresh is bounded by thirty seconds and periodic requests by fifteen minutes', async () => {
+test('Manual refresh is bounded by thirty seconds and automatic requests by five days', async () => {
   const h = harness(); await h.manager.external({ type: 'GET_RESULTS' }, dashboard); await h.capture();
   await h.manager.external({ type: 'REFRESH_RESULTS' }, dashboard); assert.equal(h.created.length, 1);
   h.advance(30_000); await h.manager.external({ type: 'REFRESH_RESULTS' }, dashboard); assert.equal(h.created.length, 2); await h.capture();
   await h.manager.alarm({ name: PERIODIC_ALARM }); assert.equal(h.created.length, 2);
+});
+
+test('Updating the fifteen-minute alarm preserves cached scores and waits five days from the last attempt, including after restart', async () => {
+  const h = harness(); await h.manager.external({ type: 'GET_RESULTS' }, dashboard); await h.capture();
+  h.alarms.set(PERIODIC_ALARM, { periodInMinutes: 15, when: NOW + 15 * 60_000 });
+  h.advance(15 * 60_000);
+  const updated = h.make(); await updated.initialize();
+  assert.equal(PERIOD_MS, 432_000_000);
+  assert.deepEqual(h.alarms.get(PERIODIC_ALARM), { when: NOW + 432_000_000, periodInMinutes: 7_200 });
+  await updated.startup();
+  let value = await updated.external({ type: 'GET_RESULTS' }, dashboard);
+  assert.equal(h.created.length, 1); assert.equal(value.resultsCheckedAt, new Date(NOW).toISOString());
+  assert.equal(value.resultsCheckFailed, false);
+  h.advance(432_000_000 - 15 * 60_000 - 1);
+  await updated.alarm({ name: PERIODIC_ALARM }); assert.equal(h.created.length, 1);
+  h.advance(1); await updated.alarm({ name: PERIODIC_ALARM });
+  assert.equal(h.created.length, 2);
+  assert.equal(h.alarms.get(PERIODIC_ALARM).when, NOW + 2 * 432_000_000);
+});
+
+test('A manual check resets the next five-day deadline without discarding the prior successful observation', async () => {
+  const h = harness(); await h.manager.external({ type: 'GET_RESULTS' }, dashboard); await h.capture();
+  h.advance(2 * 24 * 60 * 60_000);
+  await h.manager.external({ type: 'REFRESH_RESULTS' }, dashboard);
+  assert.equal(h.created.length, 2);
+  assert.equal(h.alarms.get(PERIODIC_ALARM).when, NOW + 7 * 24 * 60 * 60_000);
+  const hello = await h.manager.source({ type: 'SOURCE_HELLO' }, h.sender());
+  await h.manager.source({ type: 'SOURCE_FAILED', requestId: hello.requestId }, h.sender());
+  h.advance(3 * 24 * 60 * 60_000);
+  await h.manager.alarm({ name: PERIODIC_ALARM });
+  const value = await h.manager.external({ type: 'GET_RESULTS' }, dashboard);
+  assert.equal(h.created.length, 2); assert.equal(value.resultsCheckedAt, new Date(NOW).toISOString());
+  assert.equal(value.resultsCheckFailed, true);
+});
+
+test('A lost alarm is restored from the saved attempt and an overdue restart launches only one catch-up check', async () => {
+  const h = harness(); await h.manager.external({ type: 'GET_RESULTS' }, dashboard); await h.capture();
+  h.advance(4 * 24 * 60 * 60_000); h.alarms.delete(PERIODIC_ALARM);
+  const restarted = h.make(); await restarted.initialize();
+  assert.equal(h.alarms.get(PERIODIC_ALARM).when, NOW + 432_000_000);
+  await restarted.startup(); assert.equal(h.created.length, 1);
+  h.advance(2 * 24 * 60 * 60_000); h.alarms.delete(PERIODIC_ALARM);
+  const overdue = h.make(); await overdue.initialize(); await overdue.startup();
+  await overdue.external({ type: 'GET_RESULTS' }, dashboard); await overdue.alarm({ name: PERIODIC_ALARM });
+  assert.equal(h.created.length, 2);
+  assert.equal(h.alarms.get(PERIODIC_ALARM).when, NOW + 11 * 24 * 60 * 60_000);
 });
 
 test('Activation received while a capture is completing protects the tab without waiting for the serialized storage update', async () => {

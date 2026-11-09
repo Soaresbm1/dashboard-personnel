@@ -1,5 +1,5 @@
 export const PROTOCOL = 'dashboard-football-v1';
-export const PERIOD_MS = 15 * 60_000;
+export const PERIOD_MS = 5 * 24 * 60 * 60_000;
 export const CAPTURE_TIMEOUT_MS = 90_000;
 export const REFRESH_COOLDOWN_MS = 30_000;
 export const PERIODIC_ALARM = 'dashboard-football-refresh';
@@ -24,6 +24,12 @@ export function createCaptureManager(api, reader, options = {}) {
     const result = queue.then(callback, callback); queue = result.catch(() => {}); return result;
   };
   async function saveState() { await api.storage.local.set({ [LOCAL_KEY]: state }); }
+  async function scheduleNextCheck() {
+    await api.alarms.create(PERIODIC_ALARM, {
+      when: state.attemptAt ? Math.max(now() + 1_000, state.attemptAt + PERIOD_MS) : now() + PERIOD_MS,
+      periodInMinutes: PERIOD_MS / 60_000
+    });
+  }
   async function saveFlight() {
     if (flight) await api.storage.session.set({ [SESSION_KEY]: flight });
     else await api.storage.session.remove(SESSION_KEY);
@@ -80,6 +86,7 @@ export function createCaptureManager(api, reader, options = {}) {
     await expire();
     if (flight || now() - state.attemptAt < (manual ? REFRESH_COOLDOWN_MS : PERIOD_MS)) return;
     state.attemptAt = now(); await saveState();
+    await scheduleNextCheck();
     try {
       creating = true;
       const tab = await api.tabs.create({ url: reader.SOURCE_URL, active: false });
@@ -99,7 +106,8 @@ export function createCaptureManager(api, reader, options = {}) {
   async function initialize() {
     return serialize(async () => {
       await load(); await expire();
-      if (!await api.alarms.get(PERIODIC_ALARM)) await api.alarms.create(PERIODIC_ALARM, { periodInMinutes: 15 });
+      const alarm = await api.alarms.get(PERIODIC_ALARM);
+      if (alarm?.periodInMinutes !== PERIOD_MS / 60_000) await scheduleNextCheck();
     });
   }
   return {
