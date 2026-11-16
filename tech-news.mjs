@@ -1,5 +1,5 @@
 import { createAutoRefresh } from './auto-refresh.mjs';
-import { initializeInfoCarousel } from './info-carousel.mjs';
+import { initializeInfoCarousel } from './info-carousel.mjs?v=20261116-auto10';
 import { TECH_NEWS_URL, TECH_NEWS_INTERVAL_MS, TECH_NEWS_CACHE_KEY, SERVICES, serviceLabel, emptyService,
   parseTechSnapshot, parseStatuspage, mergeTechSnapshot, readTechCache, normalizeArticles, techDate } from './tech-news-core.mjs';
 
@@ -13,7 +13,7 @@ export function initializeTechNews(options = {}) {
   let snapshot = null, inFlight = false, disposed = false, lastAttemptAt = -Infinity, controller = null, timer = null;
   try { snapshot = readTechCache(storage?.getItem(TECH_NEWS_CACHE_KEY), now()); } catch { /* Keep working without local storage. */ }
   let requestFailed = false;
-  const carousel = initializeInfoCarousel(doc), cards = new Map();
+  const carousel = initializeInfoCarousel(doc, { window: win }), cards = new Map();
   function link(element, url) { element.href = url; element.target = '_blank'; element.rel = 'noopener noreferrer'; element.referrerPolicy = 'no-referrer'; }
   function render() {
     const at = now(), services = SERVICES.map(config => snapshot?.services.find(item => item.id === config.id) || emptyService(config));

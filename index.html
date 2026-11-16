@@ -7,7 +7,7 @@
   <meta name="description" content="Votre agenda, vos mails, vos tâches, l’intranet et les actualités tech, réunis dans une vue compacte.">
   <title>Dashboard — Vue d’ensemble</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=20261116-carousel-2">
+  <link rel="stylesheet" href="styles.css?v=20261116-auto10">
   <script src="app.js" type="module"></script>
   <script src="microsoft-connection.mjs" type="module"></script>
   <script src="outlook.js" type="module"></script>
@@ -22,7 +22,7 @@
   <script src="intranet-health.mjs" type="module"></script>
   <script src="benfica.mjs" type="module"></script>
   <script src="lelocle.mjs" type="module"></script>
-  <script src="tech-news.mjs?v=20261116-carousel" type="module"></script>
+  <script src="tech-news.mjs?v=20261116-auto10" type="module"></script>
 </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:none">
@@ -126,6 +126,7 @@
               <button id="tech-prev" class="tech-carousel-button" type="button" aria-label="Information précédente" aria-controls="tech-carousel" disabled><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
               <span id="tech-slide-position" class="tech-slide-position" role="status" aria-live="polite" aria-atomic="true">1 / 1</span>
               <button id="tech-next" class="tech-carousel-button" type="button" aria-label="Information suivante" aria-controls="tech-carousel" disabled><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+              <button id="tech-rotation-toggle" class="tech-carousel-button tech-rotation-toggle" type="button" aria-label="Mettre en pause le défilement automatique" aria-controls="tech-carousel" aria-pressed="false">Pause</button>
             </div>
             <p id="tech-news-warning" class="tech-news-warning" role="status" aria-live="polite" hidden></p>
             <p id="tech-news-meta" class="tech-news-meta"></p>
