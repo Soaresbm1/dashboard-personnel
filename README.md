@@ -10,6 +10,18 @@ Sur ordinateur, le résumé et les accès rapides précèdent une grille unique 
 
 À partir de 1040 × 650 pixels utiles, les quatre panneaux et leurs actions tiennent dans la hauteur de l’écran. Seules les listes longues défilent à l’intérieur de leur panneau, avec accès au clavier. Les éléments des listes chargées restent accessibles. Sur petit écran, après zoom ou en présence d’un message d’erreur, la page peut s’allonger pour conserver une lecture complète.
 
+## Actualités tech et incidents publics
+
+Un panneau compact réunit les statuts publics Microsoft, OpenAI et Anthropic, puis jusqu’à cinq titres récents concernant Microsoft, l’IA, Nvidia, le cloud et la cybersécurité. Chaque titre conserve sa source, sa date en heure suisse et son lien vers l’article. Aucun texte intégral d’article n’est recopié. Le panneau fonctionne sans connexion Microsoft et ne consulte aucune donnée privée.
+
+Le navigateur interroge les API officielles OpenAI et Claude toutes les cinq minutes, avec lecture conjointe du résumé et des incidents. Un incident résolu reste distinct d’un incident en cours ; un état inconnu n’est jamais assimilé à un service opérationnel. Le signal public Microsoft ne couvre pas tous les incidents du locataire Microsoft 365 : l’état vert signifie uniquement « Aucun avis public », et cette limite figure dans le texte accessible du statut.
+
+Le workflow `tech-news.yml` collecte les statuts et les flux RSS du Monde Informatique, de Numerama et du Monde Pixels toutes les trente minutes environ. Il publie uniquement un petit fichier public sur la branche `tech-news-data`, sans modifier `main` ni redéployer la page à chaque relevé. Les collectes utilisent des URL fixes sans identifiants. Le jeton éphémère GitHub du workflow sert uniquement à publier le fichier dans ce dépôt ; il n’est transmis ni aux médias ni aux fournisseurs de services. Les exécutions GitHub planifiées peuvent être retardées : les dates de collecte restent visibles et une source trop ancienne est signalée.
+
+La page relit ce fichier toutes les cinq minutes lorsqu’elle est visible et en ligne. En cas d’échec, les dernières informations publiques sont conservées avec leur date d’origine et un avertissement. Les statuts restent individuellement datés ; une nouvelle collecte des titres ne rajeunit pas un ancien statut. Seules ces données publiques sont conservées dans le cache local. Les liens sont limités aux domaines des sources connues et les titres sont affichés comme texte, sans HTML distant.
+
+Validation : `npm run test:tech-news` et `npm run test:tech-collector`. Le bouton d’actualisation lit les dernières sources disponibles, sans déclencher de connexion ou d’action sur les comptes.
+
 ## Benfica
 
 Le bandeau du résumé affiche les trois prochains matchs de l’équipe première masculine du Benfica, toutes compétitions, entre la météo et GitHub. Chaque ligne présente les deux équipes dans l’ordre domicile–extérieur, la date, l’heure en `Europe/Zurich` et la compétition. Un horaire provisoire reste « horaire à confirmer » ; les matchs commencés, terminés, annulés ou reportés ne sont pas présentés comme de prochains matchs programmés.

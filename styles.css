@@ -236,6 +236,26 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 #intranet-work { --panel-accent: var(--teal); --panel-tint: #eff9f6; }
 #mail-preview { --panel-accent: var(--violet); --panel-tint: #f6f2fc; }
 #news-preview { --panel-accent: var(--amber); --panel-tint: #fdf8ee; }
+#tech-news-panel { --panel-accent: var(--blue); --panel-tint: #f2f5ff; grid-column: 1 / -1; }
+.tech-status-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); flex-shrink: 0; gap: 6px; margin: 0 0 7px; padding: 0; list-style: none; }
+.tech-status-list > li { min-width: 0; }
+.tech-status { display: block; min-width: 0; padding: 6px 7px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.tech-status-name { display: block; overflow: hidden; color: var(--ink); font-size: 10px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.tech-status-name::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: #8b96a7; vertical-align: 1px; }
+.tech-status-state { display: block; overflow: hidden; margin-top: 2px; color: var(--muted); font-size: 9px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.tech-status[data-state="operational"] .tech-status-name::before { background: #23856b; }
+.tech-status[data-state="degraded"] .tech-status-name::before, .tech-status[data-state="maintenance"] .tech-status-name::before { background: #aa741c; }
+.tech-status[data-state="incident"] .tech-status-name::before, .tech-status[data-state="outage"] .tech-status-name::before { background: #bb4357; }
+.tech-status[data-stale="true"] { border-style: dashed; }
+.tech-news-scroll { min-width: 0; min-height: 0; }
+.tech-news-list { margin: 0; padding: 0; list-style: none; }
+.tech-news-item { padding: 8px 0; border-top: 1px solid var(--line); }
+.tech-news-item:first-child { border-top: 0; }
+.tech-news-link { display: -webkit-box; overflow: hidden; color: var(--ink); font-size: 12px; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.tech-news-link:focus-visible { display: block; overflow: visible; -webkit-line-clamp: unset; }
+.tech-news-detail { display: block; margin-top: 3px; color: var(--muted); font-size: 9px; line-height: 1.5; }
+.tech-news-warning { flex-shrink: 0; margin-bottom: 5px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.tech-news-empty { padding: 8px 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .panel-header h2::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--panel-accent); vertical-align: 2px; }
 .panel .item-count { background: var(--panel-tint); color: var(--panel-accent); }
 .panel-footer a:hover, .quick-access a:hover { color: var(--blue); }
@@ -312,11 +332,12 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
    Only the longer lists scroll; errors and smaller/zoomed views may grow. */
 @media (min-width: 1040px) and (min-height: 650px) {
   .dashboard-shell { height: 100dvh; }
-  .overview-grid { flex: 1; min-height: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, .95fr) minmax(0, 1.05fr); grid-template-areas: "agenda work work" "mail news news"; }
+  .overview-grid { flex: 1; min-height: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, .95fr) minmax(0, 1.05fr); grid-template-areas: "agenda work work" "mail news tech"; }
   .agenda-panel { grid-area: agenda; }
   .work-panel { grid-area: work; }
   #mail-preview { grid-area: mail; }
   #news-preview { grid-area: news; }
+  #tech-news-panel { grid-area: tech; }
   .panel-header > div { display: flex; align-items: baseline; min-width: 0; gap: 8px; }
   .panel-header h2 { flex-shrink: 0; }
   .panel-account { min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -1,0 +1,35 @@
+name: Public tech news and status
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '13,43 * * * *'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/tech-news.yml'
+      - 'scripts/collect-tech-news.py'
+      - 'scripts/publish-tech-news.mjs'
+      - 'tests/test_collect_tech_news.py'
+permissions:
+  contents: read
+concurrency:
+  group: public-tech-news
+  cancel-in-progress: false
+jobs:
+  collect-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Test public-feed parsing and failure retention
+        run: python3 -m unittest discover -s tests -p 'test_collect_tech_news.py'
+      - name: Collect fixed public sources without credentials
+        run: python3 scripts/collect-tech-news.py
+      - name: Publish only the public snapshot to its data branch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/publish-tech-news.mjs

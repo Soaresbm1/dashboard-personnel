@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f7f7f6">
-  <meta name="description" content="Votre agenda, vos mails, vos tâches et la dernière publication de l’intranet, réunis dans une vue simple.">
+  <meta name="description" content="Votre agenda, vos mails, vos tâches, l’intranet et les actualités tech, réunis dans une vue compacte.">
   <title>Dashboard — Vue d’ensemble</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
@@ -22,6 +22,7 @@
   <script src="intranet-health.mjs" type="module"></script>
   <script src="benfica.mjs" type="module"></script>
   <script src="lelocle.mjs" type="module"></script>
+  <script src="tech-news.mjs" type="module"></script>
 </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:none">
@@ -184,6 +185,22 @@
           <div id="news-items" class="scroll-list" role="region" aria-label="Dernière publication" tabindex="0" aria-busy="false"><p class="news-empty">La dernière publication apparaîtra ici.</p></div>
           <div class="connection-panel" hidden><button id="news-connect" class="button button-primary" type="button">Connecter les actualités</button></div>
           <footer class="panel-footer"><a href="https://intranet.isp-spi.ch/intranet" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir l’intranet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="news-last-updated"></span></footer>
+        </section>
+        <section id="tech-news-panel" class="panel" aria-labelledby="tech-news-title">
+          <header class="panel-header">
+            <div><h2 id="tech-news-title">Actualités tech</h2><p class="panel-account">Incidents et dernières nouvelles</p></div>
+            <button id="tech-news-refresh" type="button" class="icon-button" aria-label="Actualiser les actualités tech" title="Actualiser les actualités tech"><svg class="icon" aria-hidden="true"><use href="#i-reset"/></svg></button>
+          </header>
+          <ul id="tech-status-list" class="tech-status-list" aria-label="État des services Microsoft, OpenAI et Anthropic">
+            <li><a class="tech-status" data-state="unknown" href="https://status.cloud.microsoft/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer"><span class="tech-status-name">Microsoft</span><span class="tech-status-state">Non vérifié</span></a></li>
+            <li><a class="tech-status" data-state="unknown" href="https://status.openai.com/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer"><span class="tech-status-name">OpenAI</span><span class="tech-status-state">Non vérifié</span></a></li>
+            <li><a class="tech-status" data-state="unknown" href="https://status.claude.com/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer"><span class="tech-status-name">Anthropic</span><span class="tech-status-state">Non vérifié</span></a></li>
+          </ul>
+          <p id="tech-news-warning" class="tech-news-warning" role="status" aria-live="polite" hidden></p>
+          <div class="tech-news-scroll scroll-list" role="region" aria-label="Dernières actualités technologiques" tabindex="0">
+            <ul id="tech-news-list" class="tech-news-list" aria-busy="false"><li class="tech-news-empty">Chargement des dernières nouvelles…</li></ul>
+          </div>
+          <footer class="panel-footer"><span>Sources publiques</span><span id="tech-news-meta" role="status" aria-live="polite"></span></footer>
         </section>
       </div>
       <footer class="page-footer"><span>Actualisation automatique · services 1 min · GitHub 5 min · météo 15 min</span><span>Consultation en lecture seule</span></footer>
