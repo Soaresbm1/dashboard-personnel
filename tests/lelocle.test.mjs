@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { LELOCLE_URL, LELOCLE_SOURCE_URL, LELOCLE_CACHE_KEY, LELOCLE_INTERVAL_MS,
   parseLeLocleCalendar, parseLeLocleFeed, parseLeLocleDate, upcomingLeLocleMatches, leLocleMatchWhen, safeLeLocleUrl, selectLeLocleView, readLeLocleCache, mergeLeLocleSnapshot, mergeLeLocleExtension } from '../lelocle-core.mjs';
 import { initializeLeLocleFixtures } from '../lelocle.mjs';
+import { ANF_TEAMS, anfTeam, anfCacheKey } from '../anf-teams.mjs';
 
 const NOW = Date.parse('2026-11-09T12:00:00Z');
 const calendar = (...events) => `BEGIN:VCALENDAR\r\r\nVERSION:2.0\r\r\nX-WR-CALNAME:FC Le Locle - Juniors A\r\r\n${events.join('\r\r\n')}\r\r\nEND:VCALENDAR\r\r\n`;
@@ -49,14 +50,18 @@ test('No feed URL can override the fixed official team calendar link', () => {
 function harness(options = {}) {
   const nodes = new Map(), stored = new Map(), network = [], listeners = new Map();
   if (options.cached) stored.set(LELOCLE_CACHE_KEY, options.cached);
+  if (options.selected) stored.set('dashboard.anf.selected.v1', options.selected);
   let clock = NOW, settings;
   class Element {
-    constructor() { this.children = []; this.textContent = ''; this.dataset = {}; this.attributes = {}; this.hidden = false; }
+    constructor() { this.children = []; this.textContent = ''; this.dataset = {}; this.attributes = {}; this.hidden = false; this.events = new Map(); this.value = ''; }
     append(...items) { this.children.push(...items); }
     replaceChildren(...items) { this.children = items.flatMap(x => x.fragment ? x.children : [x]); }
     setAttribute(key, value) { this.attributes[key] = value; }
+    addEventListener(name, callback) { this.events.set(name, callback); }
+    removeEventListener(name) { this.events.delete(name); }
   }
   for (const id of ['summary-lelocle', 'lelocle-mode', 'lelocle-extension-status', 'lelocle-matches', 'lelocle-status', 'lelocle-warning']) nodes.set(id, new Element());
+  if (options.selector) for (const id of ['anf-team', 'anf-team-source']) nodes.set(id, new Element());
   const doc = { hidden: false, getElementById: id => nodes.get(id), createElement: () => new Element(), createDocumentFragment: () => Object.assign(new Element(), { fragment: true }), addEventListener() {}, removeEventListener() {} };
   const win = { navigator: { onLine: !options.offline }, addEventListener: (name, callback) => listeners.set(name, callback), removeEventListener: name => listeners.delete(name) };
   const instance = initializeLeLocleFixtures({ document: doc, window: win, now: () => clock,
@@ -221,4 +226,54 @@ test('An invalid, missing or older extension snapshot cannot corrupt newer valid
   assert.equal(mergeLeLocleExtension(snapshot, { installed: true, resultsState: 'ready', resultsCheckedAt: new Date(NOW).toISOString(), resultsCheckFailed: false, results: [result('2', { scoreHome: '-' })] }, NOW), snapshot);
   const older = mergeLeLocleExtension(snapshot, { installed: true, resultsState: 'ready', resultsCheckedAt: new Date(NOW - 60_000).toISOString(), resultsCheckFailed: false, results: [] }, NOW);
   assert.equal(older.results.length, 1); assert.equal(older.resultsAt, NOW);
+});
+
+const teamCalendar = id => calendar(event().replace('FC Le Locle (Jun.A)', id === '74009' ? 'FC Le Parc (SFPL)' : 'FC Le Parc 2 (1 L Futsal)')).replace('X-WR-CALNAME:FC Le Locle - Juniors A', `X-WR-CALNAME:${anfTeam(id).calendarName}`);
+test('The two futsal calendars have distinct verified identities and cannot be confused with each other or Le Locle', () => {
+  assert.equal(ANF_TEAMS.length, 3);
+  for (const id of ['74009', '68914']) {
+    const parsed = parseLeLocleFeed(feed(teamCalendar(id), { teamId: id }), NOW, id);
+    assert.equal(parsed.matches.length, 1); assert.equal(parsed.matches[0].url, anfTeam(id).sourceUrl);
+    const other = id === '74009' ? '68914' : '74009';
+    assert.throws(() => parseLeLocleFeed(feed(teamCalendar(id), { teamId: id }), NOW, other));
+    assert.throws(() => parseLeLocleCalendar(teamCalendar(id).replace(parsed.matches[0].home, anfTeam(other).owner), id));
+    assert.equal(safeLeLocleUrl(anfTeam(other).sourceUrl, id), null);
+  }
+  assert.throws(() => anfTeam('unknown')); assert.notEqual(anfCacheKey('74009'), anfCacheKey('68914'));
+});
+
+test('Selecting a team switches feed, cache and extension together without allowing an old team reply to overwrite the new panel', async () => {
+  const subscriptions = [];
+  const h = harness({ selector: true, extensionBridgeFactory: (receive, config) => {
+    const subscription = { receive, teamId: config.teamId, disposed: false }; subscriptions.push(subscription);
+    return { dispose() { subscription.disposed = true; } };
+  }, fetch: url => {
+    const id = new URL(url).searchParams.get('team') || '34107';
+    return new Response(JSON.stringify(feed(id === '34107' ? calendar(event()) : teamCalendar(id), { teamId: id })));
+  } }); await settle();
+  try {
+    assert.equal(h.nodes.get('anf-team').value, '34107');
+    const choose = async id => { const selector = h.nodes.get('anf-team'); selector.value = id; selector.events.get('change')(); await settle(); };
+    await choose('74009');
+    assert.match(text(h.nodes.get('lelocle-matches')), /FC Le Parc \(SFPL\)/);
+    assert.equal(h.nodes.get('anf-team-source').href, anfTeam('74009').sourceUrl);
+    assert.ok(h.stored.has(anfCacheKey('74009'))); assert.equal(subscriptions[0].disposed, true);
+    await choose('68914');
+    const original = text(h.nodes.get('lelocle-matches'));
+    subscriptions[1].receive({ installed: true, teamId: '74009', resultsState: 'ready', results: [], resultsCheckedAt: new Date(NOW).toISOString(), resultsCheckFailed: false });
+    assert.equal(text(h.nodes.get('lelocle-matches')), original); assert.match(original, /FC Le Parc 2/);
+    assert.equal(h.stored.get('dashboard.anf.selected.v1'), '68914'); assert.equal(subscriptions.at(-1).teamId, '68914');
+    assert.equal(h.network.length, 3); assert.ok(h.stored.has(LELOCLE_CACHE_KEY)); assert.ok(h.stored.has(anfCacheKey('68914')));
+  } finally { h.instance.dispose(); }
+});
+
+test('A saved futsal selection is restored, while a Le Locle cache or legacy extension cannot supply that team results', async () => {
+  const h = harness({ selector: true, selected: '68914', fetch: () => Promise.reject(new Error('offline')) }); await settle();
+  try {
+    assert.equal(h.nodes.get('anf-team').value, '68914'); assert.ok(h.network[0].url.endsWith('?team=68914'));
+    assert.ok(!text(h.nodes.get('lelocle-matches')).includes('FC Le Locle'));
+  } finally { h.instance.dispose(); }
+  const snapshot = parseLeLocleFeed(feed(teamCalendar('74009'), { teamId: '74009' }), NOW, '74009');
+  assert.equal(mergeLeLocleExtension(snapshot, { installed: true, resultsState: 'ready', resultsCheckedAt: new Date(NOW).toISOString(), resultsCheckFailed: false, results: [] }, NOW, '74009'), snapshot);
+  assert.equal(mergeLeLocleExtension(snapshot, { installed: true, teamId: '68914', resultsState: 'ready', resultsCheckedAt: new Date(NOW).toISOString(), resultsCheckFailed: false, results: [] }, NOW, '74009'), snapshot);
 });

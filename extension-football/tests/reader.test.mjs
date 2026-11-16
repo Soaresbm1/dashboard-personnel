@@ -9,10 +9,11 @@ const NOW = Date.parse('2026-11-09T12:00:00Z');
 const plain = value => JSON.parse(JSON.stringify(value));
 const result = (id = '1', extra = {}) => ({ id, home: 'FC Le Locle', away: 'Fixture', startsAt: '2026-11-08T15:00:00.000Z', timeConfirmed: true, scoreHome: 0, scoreAway: 2, league: 'Juniors A', url: reader.SOURCE_URL, ...extra });
 function element(textContent = '', query = {}, classes = []) { return { textContent, querySelector: selector => query[selector] || null, classList: { contains: value => classes.includes(value) } }; }
-function row({ id = '1', home = 'FC Le Locle', away = 'Fixture', date = 'Di 08.11.2026', time = '16:00', homeScore = '0', awayScore = '2', status = '' } = {}) {
+function row({ id = '1', home = 'FC Le Locle', away = 'Fixture', date = 'Di 08.11.2026', time = '16:00', homeScore = '0', awayScore = '2', status = '', href } = {}) {
   const dateSpan = element(date), dateNode = element(`${date}${time}`, { span: dateSpan });
   const node = element(`${date} ${time} ${home} ${away} ${homeScore} ${awayScore} ${status} N° match ${id}`, {
-    '.date': dateNode, '.teamA': element(home), '.teamB': element(away), '.goals .torA': homeScore === null ? null : element(homeScore), '.goals .torB': awayScore === null ? null : element(awayScore)
+    '.date': dateNode, '.teamA': element(home), '.teamB': element(away), '.goals .torA': homeScore === null ? null : element(homeScore), '.goals .torB': awayScore === null ? null : element(awayScore),
+    '.telegramm-link a': href ? { getAttribute: () => href } : null
   });
   return element('', { '.row.spiel': node }, ['list-group-item']);
 }
@@ -25,6 +26,53 @@ test('Only the exact public team calendar URL is eligible regardless of query or
   assert.equal(reader.isSourceUrl(reader.SOURCE_URL), true);
   assert.equal(reader.isSourceUrl('https://matchcenter-anf.football.ch/default.aspx?v=919&t=34107&oid=15&lng=2&a=pt'), true);
   for (const url of [reader.SOURCE_URL + '#x', reader.SOURCE_URL + '&extra=1', reader.SOURCE_URL + '&t=34107', reader.SOURCE_URL.replace('34107', '34108'), reader.SOURCE_URL.replace('https:', 'http:'), reader.SOURCE_URL.replace('football.ch/', 'football.ch.evil.test/'), reader.SOURCE_URL.replace('https://', 'https://user@')]) assert.equal(reader.isSourceUrl(url), false);
+});
+
+test('Each configured team has a fixed club, category and exact owner aliases; selectors cannot cross-bind', () => {
+  assert.deepEqual(plain(reader.TEAMS.map(team => team.id)), ['34107', '74009', '68914']);
+  for (const team of reader.TEAMS) {
+    assert.equal(reader.isSourceUrl(team.sourceUrl, team.id), true);
+    assert.equal(reader.teamFromUrl(team.sourceUrl).id, team.id);
+    for (const other of reader.TEAMS.filter(other => other.id !== team.id)) {
+      assert.equal(reader.isSourceUrl(team.sourceUrl, other.id), false);
+      assert.equal(reader.isOwnerName(other.owners[0], team.id), false);
+      assert.throws(() => reader.normalizeResults([result('1', { home: other.owners[0], url: team.sourceUrl })], NOW, team.id));
+    }
+    assert.equal(reader.isSourceUrl(team.sourceUrl.replace(`v=${team.clubId}`, 'v=123')), false);
+    assert.equal(reader.isSourceUrl(team.sourceUrl.replace('a=pt', 'a=trr')), false);
+  }
+  assert.throws(() => reader.normalizeResults([], NOW, 'unknown'));
+});
+
+test('Real public DOM captures use h3 and the team calendar after a separate club table; future non-counted 0–0 never becomes a result', () => {
+  const fixture = JSON.parse(fs.readFileSync(new URL('fixtures/anf-futsal-public-dom.json', import.meta.url), 'utf8'));
+  const capturedAt = Date.parse(fixture.capturedAt);
+  for (const team of fixture.teams) {
+    const items = team.rows.map(value => value.competitionHeading ? element(value.competitionHeading, {}, ['list-group-item', 'sppTitel'])
+      : row({ ...value, id: value.number, homeScore: value.scoreHome, awayScore: value.scoreAway }));
+    const clubTable = { children: [] }, calendar = { children: items, previousElementSibling: element('', { h4: element('Calendrier équipe') }) };
+    const doc = { URL: team.url, readyState: team.readyState, querySelector: () => null,
+      querySelectorAll: selector => selector === 'h3' ? [element(team.heading)] : [clubTable, calendar] };
+    const output = plain(reader.readResults(doc, capturedAt, team.teamId));
+    assert.deepEqual(output.map(value => value.id), team.teamId === '74009' ? ['4313445', '4310427', '4310422'] : ['4411629', '4408842']);
+    assert.ok(output.every(value => value.url === team.url));
+    if (team.teamId === '68914') {
+      assert.equal(output[0].scoreHome, 1); assert.equal(output[0].scoreAway, 9);
+      assert.ok(!reader.readResults(doc, Date.parse('2027-03-01T12:00:00Z'), team.teamId).some(value => value.id === '185620'));
+    }
+    assert.throws(() => reader.readResults(doc, capturedAt, '34107'));
+    const wrongCategory = { ...doc, querySelectorAll: selector => selector === 'h3' ? [element('Equipe - Juniors A')] : [clubTable, calendar] };
+    assert.throws(() => reader.readResults(wrongCategory, capturedAt, team.teamId));
+  }
+});
+
+test('Unidentified ambiguous tables and unrelated team rows cannot clear an existing result sample', () => {
+  const team = reader.getTeam('74009'), items = [row({ home: 'FC Le Parc' })];
+  const doc = { URL: team.sourceUrl, readyState: 'complete', querySelector: () => null,
+    querySelectorAll: selector => selector === 'h3' ? [element(`Equipe - ${team.category}`)] : [{ children: items }, { children: items }] };
+  assert.throws(() => reader.readResults(doc, NOW));
+  const ownerMismatch = { ...doc, querySelectorAll: selector => selector === 'h3' ? [element(`Equipe - ${team.category}`)] : [{ children: [row({ home: 'FC Le Parc 2' })] }] };
+  assert.throws(() => reader.readResults(ownerMismatch, NOW));
 });
 test('Swiss winter/summer dates convert precisely and unknown, invalid or ambiguous times are rejected', () => {
   assert.equal(reader.parseSwissDate('Di 08.11.2026', '16:00').startsAt, '2026-11-08T15:00:00.000Z');

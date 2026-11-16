@@ -2,6 +2,52 @@
 
 declare(strict_types=1);
 
+/** Fixed public sources only; HTTP callers may choose an allowlisted team ID, never a URL. */
+final class DashboardAnfTeams
+{
+    public const DEFAULT_ID = '34107';
+    public const TEAMS = [
+        '34107' => ['id'=>'34107', 'clubId'=>'919', 'name'=>'FC Le Locle', 'category'=>'Juniors A',
+            'calendarName'=>'FC Le Locle - Juniors A', 'detailsUrl'=>'https://matchcenter-anf.football.ch/default.aspx?a=pt&lng=2&oid=15&t=34107&v=919'],
+        '74009' => ['id'=>'74009', 'clubId'=>'902', 'name'=>'FC Le Parc', 'category'=>'Swiss Futsal Premier League',
+            'calendarName'=>'FC Le Parc - Swiss Futsal Premier League', 'detailsUrl'=>'https://matchcenter-anf.football.ch/default.aspx?a=pt&lng=2&oid=15&t=74009&v=902'],
+        '68914' => ['id'=>'68914', 'clubId'=>'902', 'name'=>'FC Le Parc 2', 'category'=>'1ère ligue (Futsal) 2',
+            'calendarName'=>'FC Le Parc - 1ère ligue (Futsal) 2', 'detailsUrl'=>'https://matchcenter-anf.football.ch/default.aspx?a=pt&lng=2&oid=15&t=68914&v=902'],
+    ];
+
+    public static function get(string $teamId = self::DEFAULT_ID): array
+    {
+        if (!array_key_exists($teamId, self::TEAMS)) throw new RuntimeException('team_not_allowed');
+        return self::TEAMS[$teamId];
+    }
+    public static function select(array $query): string
+    {
+        if ($query === []) return self::DEFAULT_ID;
+        if (array_keys($query) !== ['team'] || !is_string($query['team'])) throw new RuntimeException('team_not_allowed');
+        return self::get($query['team'])['id'];
+    }
+    public static function calendarSource(string $teamId = self::DEFAULT_ID): string
+    {
+        $team = self::get($teamId);
+        return 'https://matchcenter-anf.football.ch/portaldata/1/nisrd/WebService/verein/calendar.asmx/Team?v='.$team['clubId'].'&t='.$team['id'].'&sp=fr&calName='.rawurlencode($team['calendarName']).'&format=ics';
+    }
+    public static function cacheDirectory(string $application, string $teamId = self::DEFAULT_ID): string
+    {
+        self::get($teamId);
+        return $application.'/storage/app/private/'.($teamId === self::DEFAULT_ID ? 'dashboard-lelocle' : 'dashboard-anf/'.$teamId);
+    }
+    public static function owner(string $value, string $teamId = self::DEFAULT_ID): bool
+    {
+        self::get($teamId);
+        $value = trim(preg_replace('/\s+/u', ' ', $value) ?? '');
+        return preg_match(match ($teamId) {
+            self::DEFAULT_ID => '/^FC Le Locle(?:\s*\(Jun\.?\s*A\))?$/iu',
+            '74009' => '/^FC Le Parc(?:\s*\(SFPL\))?$/iu',
+            '68914' => '/^FC Le Parc 2(?:\s*\(1 L Futsal\))?$/iu',
+        }, $value) === 1;
+    }
+}
+
 /** Public team-calendar proxy. No Laravel boot, account data, credentials or caller-selected URLs. */
 final class DashboardLeLocleFixtures
 {
@@ -12,9 +58,11 @@ final class DashboardLeLocleFixtures
     public const MAX_BYTES = 524288;
     private Closure $request;
     private Closure $clock;
+    private array $team;
 
-    public function __construct(private string $directory, ?callable $request = null, ?callable $clock = null)
+    public function __construct(private string $directory, ?callable $request = null, ?callable $clock = null, string $teamId = DashboardAnfTeams::DEFAULT_ID)
     {
+        $this->team = DashboardAnfTeams::get($teamId);
         $this->request = $request ? Closure::fromCallable($request) : self::requestCalendar(...);
         $this->clock = $clock ? Closure::fromCallable($clock) : static fn (): float => microtime(true);
     }
@@ -39,12 +87,12 @@ final class DashboardLeLocleFixtures
             $state = ['attemptAt' => $now, 'failed' => true, 'sample' => $state['sample'] ?? null];
             $this->write($state);
             try {
-                $response = ($this->request)(self::SOURCE);
+                $response = ($this->request)(DashboardAnfTeams::calendarSource($this->team['id']));
                 if (!is_array($response) || ($response['status'] ?? null) !== 200 || !is_string($response['body'] ?? null)) {
                     throw new RuntimeException('calendar_unavailable');
                 }
-                $calendar = self::validateCalendar($response['body']);
-                $state['sample'] = ['schemaVersion' => 1, 'teamId' => self::TEAM_ID,
+                $calendar = self::validateCalendar($response['body'], $this->team['id']);
+                $state['sample'] = ['schemaVersion' => 1, 'teamId' => $this->team['id'],
                     'checkedAt' => gmdate('Y-m-d\TH:i:s\Z', (int) ($this->clock)()), 'calendar' => $calendar];
                 $state['failed'] = false;
             } catch (Throwable) {
@@ -58,8 +106,9 @@ final class DashboardLeLocleFixtures
         }
     }
 
-    public static function validateCalendar(string $calendar): string
+    public static function validateCalendar(string $calendar, string $teamId = DashboardAnfTeams::DEFAULT_ID): string
     {
+        $team = DashboardAnfTeams::get($teamId);
         if ($calendar === '' || strlen($calendar) > self::MAX_BYTES || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $calendar) || preg_match('//u', $calendar) !== 1) {
             throw new RuntimeException('calendar_unavailable');
         }
@@ -83,7 +132,7 @@ final class DashboardLeLocleFixtures
                 $names[] = $match[1];
             }
         }
-        if ($stack !== [] || $names !== [self::CALENDAR_NAME]) throw new RuntimeException('calendar_unavailable');
+        if ($stack !== [] || $names !== [$team['calendarName']]) throw new RuntimeException('calendar_unavailable');
         return $calendar;
     }
 
@@ -100,8 +149,9 @@ final class DashboardLeLocleFixtures
 
     private static function requestCalendar(string $url): array
     {
-        if ($url !== self::SOURCE || !function_exists('curl_init')) throw new RuntimeException('calendar_unavailable');
-        $curl = curl_init(self::SOURCE);
+        $allowed = array_map(static fn (string $id): string => DashboardAnfTeams::calendarSource($id), array_column(DashboardAnfTeams::TEAMS, 'id'));
+        if (!in_array($url, $allowed, true) || !function_exists('curl_init')) throw new RuntimeException('calendar_unavailable');
+        $curl = curl_init($url);
         if ($curl === false) throw new RuntimeException('calendar_unavailable');
         $body = ''; $tooLarge = false;
         curl_setopt_array($curl, [CURLOPT_FOLLOWLOCATION => false, CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
@@ -131,10 +181,10 @@ final class DashboardLeLocleFixtures
         if (!is_array($state) || (!is_int($state['attemptAt'] ?? null) && !is_float($state['attemptAt'] ?? null)) || !is_finite((float) $state['attemptAt']) || !is_bool($state['failed'] ?? null)) return [];
         $sample = $state['sample'] ?? null;
         if ($sample !== null) {
-            if (!is_array($sample) || ($sample['schemaVersion'] ?? null) !== 1 || ($sample['teamId'] ?? '') !== self::TEAM_ID
+            if (!is_array($sample) || ($sample['schemaVersion'] ?? null) !== 1 || ($sample['teamId'] ?? '') !== $this->team['id']
                 || !is_string($sample['checkedAt'] ?? null) || !preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $sample['checkedAt'])
                 || strtotime($sample['checkedAt']) === false || gmdate('Y-m-d\TH:i:s\Z', strtotime($sample['checkedAt'])) !== $sample['checkedAt'] || !is_string($sample['calendar'] ?? null)) return [];
-            try { self::validateCalendar($sample['calendar']); } catch (Throwable) { return []; }
+            try { self::validateCalendar($sample['calendar'], $this->team['id']); } catch (Throwable) { return []; }
         }
         return ['attemptAt' => $state['attemptAt'], 'failed' => $state['failed'], 'sample' => $sample];
     }
@@ -166,9 +216,11 @@ final class DashboardLeLocleResults
     public const MAX_BYTES = 1048576;
     private Closure $request;
     private Closure $clock;
+    private array $team;
 
-    public function __construct(private string $directory, ?callable $request = null, ?callable $clock = null)
+    public function __construct(private string $directory, ?callable $request = null, ?callable $clock = null, string $teamId = DashboardAnfTeams::DEFAULT_ID)
     {
+        $this->team = DashboardAnfTeams::get($teamId);
         $this->request = $request ? Closure::fromCallable($request) : self::requestResults(...);
         $this->clock = $clock ? Closure::fromCallable($clock) : static fn (): float => microtime(true);
     }
@@ -187,10 +239,10 @@ final class DashboardLeLocleResults
             $state = ['attemptAt'=>$now, 'failed'=>true, 'sample'=>$state['sample'] ?? null];
             $this->write($state);
             try {
-                $response = ($this->request)(self::SOURCE);
+                $response = ($this->request)($this->team['detailsUrl']);
                 if (!is_array($response) || ($response['status'] ?? null) !== 200 || !is_string($response['body'] ?? null)) throw new RuntimeException('results_unavailable');
-                $results = self::parseResults($response['body'], $now);
-                $state['sample'] = ['checkedAt'=>gmdate('Y-m-d\TH:i:s\Z', (int) ($this->clock)()), 'results'=>$results];
+                $results = self::parseResults($response['body'], $now, $this->team['id']);
+                $state['sample'] = ['teamId'=>$this->team['id'], 'checkedAt'=>gmdate('Y-m-d\TH:i:s\Z', (int) ($this->clock)()), 'results'=>$results];
                 $state['failed'] = false;
             } catch (Throwable) { /* A source failure does not replace an observed score or its date. */ }
             $this->write($state);
@@ -206,7 +258,7 @@ final class DashboardLeLocleResults
     public function seedFromVerifiedHtml(string $html, float $capturedAt): array
     {
         if (!is_finite($capturedAt) || $capturedAt < 946684800 || $capturedAt > ($this->clock)() + 60) throw new RuntimeException('invalid_results_capture');
-        $results = self::parseResults($html, $capturedAt);
+        $results = self::parseResults($html, $capturedAt, $this->team['id']);
         if (is_link($this->directory) || (!is_dir($this->directory) && !@mkdir($this->directory, 0700, true) && !is_dir($this->directory))) throw new RuntimeException('results_unavailable');
         if (is_link($this->directory.'/check.lock')) throw new RuntimeException('results_unavailable');
         $lock = @fopen($this->directory.'/check.lock', 'c');
@@ -216,15 +268,16 @@ final class DashboardLeLocleResults
             if (!flock($lock, LOCK_EX | LOCK_NB)) return $this->reply($this->read(), true);
             $state = $this->read();
             if (isset($state['sample']['checkedAt']) && strtotime($state['sample']['checkedAt']) >= (int)$capturedAt) return $this->reply($state, $state['failed']);
-            $sample = ['checkedAt'=>gmdate('Y-m-d\TH:i:s\Z', (int)$capturedAt), 'results'=>$results];
+            $sample = ['teamId'=>$this->team['id'], 'checkedAt'=>gmdate('Y-m-d\TH:i:s\Z', (int)$capturedAt), 'results'=>$results];
             $state = ['attemptAt'=>$state['attemptAt'] ?? 0.0, 'failed'=>true, 'sample'=>$sample];
             $this->write($state);
             return $this->reply($state, true);
         } finally { flock($lock, LOCK_UN); fclose($lock); }
     }
 
-    public static function parseResults(string $html, float $now): array
+    public static function parseResults(string $html, float $now, string $teamId = DashboardAnfTeams::DEFAULT_ID): array
     {
+        $team = DashboardAnfTeams::get($teamId);
         if ($html === '' || strlen($html) > self::MAX_BYTES || preg_match('//u', $html) !== 1 || !class_exists(DOMDocument::class)) throw new RuntimeException('results_unavailable');
         $document = new DOMDocument(); $prior = libxml_use_internal_errors(true);
         try {
@@ -232,13 +285,26 @@ final class DashboardLeLocleResults
         } finally { libxml_clear_errors(); libxml_use_internal_errors($prior); }
         $xpath = new DOMXPath($document);
         $heading = $xpath->query('//*[@id="ddmTeam"]');
-        if ($heading === false || $heading->length !== 1 || !preg_match('/(?:E|É)quipe\s*[-–]\s*Juniors A\b/u', self::text($heading->item(0)))) throw new RuntimeException('results_unavailable');
+        $headingPattern = '/^(?:E|É)quipe\s*[-–]\s*'.preg_quote($team['category'], '/').'$/u';
+        $headingValid = $heading !== false && $heading->length === 1 && preg_match($headingPattern, self::text($heading->item(0)));
+        if ($heading !== false && $heading->length === 0) {
+            $matchingHeadings = 0;
+            foreach ($xpath->query('//h3') ?: [] as $title) if (preg_match($headingPattern, self::text($title))) $matchingHeadings++;
+            $headingValid = $matchingHeadings === 1;
+        }
+        if (!$headingValid) throw new RuntimeException('results_unavailable');
         $lists = $xpath->query('//*[contains(concat(" ",normalize-space(@class)," ")," nisListeRD ") and substring(@id,string-length(@id)-11)="_tbResultate"]');
-        if ($lists === false || $lists->length !== 1) throw new RuntimeException('results_unavailable');
-        $list = $lists->item(0); $league = 'Juniors A'; $results = []; $seen = [];
+        if ($lists === false || $lists->length < 1 || $lists->length > 2) throw new RuntimeException('results_unavailable');
+        $populatedLists = [];
+        foreach ($lists as $candidate) {
+            $matches = $xpath->query('.//*[contains(concat(" ",normalize-space(@class)," ")," spiel ")]', $candidate);
+            if ($matches !== false && $matches->length > 0) $populatedLists[] = $candidate;
+        }
+        if (count($populatedLists) > 1) throw new RuntimeException('results_unavailable');
+        $list = $populatedLists[0] ?? $lists->item(0); $league = $team['category']; $results = []; $seen = [];
         foreach ($list->childNodes as $item) {
             if (!$item instanceof DOMElement) continue;
-            if (self::hasClass($item, 'sppTitel')) { $league = self::text($item) ?: 'Juniors A'; continue; }
+            if (self::hasClass($item, 'sppTitel')) { $league = self::text($item) ?: $team['category']; continue; }
             $rows = $xpath->query('.//*[contains(concat(" ",normalize-space(@class)," ")," spiel ")]', $item);
             if ($rows === false || $rows->length === 0) continue;
             if ($rows->length !== 1) throw new RuntimeException('results_unavailable');
@@ -246,7 +312,7 @@ final class DashboardLeLocleResults
             $homes = self::nodes($xpath, $row, 'teamA'); $aways = self::nodes($xpath, $row, 'teamB');
             if (count($homes) !== 1 || count($aways) !== 1) throw new RuntimeException('results_unavailable');
             $home = self::text($homes[0]); $away = self::text($aways[0]);
-            if (!$home || !$away || strlen($home)>640 || strlen($away)>640 || (int) self::owner($home) + (int) self::owner($away) !== 1) throw new RuntimeException('results_unavailable');
+            if (!$home || !$away || strlen($home)>640 || strlen($away)>640 || (int) DashboardAnfTeams::owner($home, $teamId) + (int) DashboardAnfTeams::owner($away, $teamId) !== 1) throw new RuntimeException('results_unavailable');
             $scoresA = self::nodes($xpath, $row, 'torA'); $scoresB = self::nodes($xpath, $row, 'torB');
             if ($scoresA === [] && $scoresB === []) {
                 $goals = self::nodes($xpath, $row, 'goals');
@@ -271,7 +337,7 @@ final class DashboardLeLocleResults
             foreach ($links ?: [] as $link) {
                 $url = parse_url($link->getAttribute('href')); $query = [];
                 parse_str($url['query'] ?? '', $query);
-                if (($query['v'] ?? null) === '919' && ($query['t'] ?? null) === '34107' && is_string($query['tg'] ?? null) && preg_match('/^\d{1,30}$/', $query['tg'])) { $id = $query['tg']; break; }
+                if (($query['v'] ?? null) === $team['clubId'] && ($query['t'] ?? null) === $teamId && is_string($query['tg'] ?? null) && preg_match('/^\d{1,30}$/', $query['tg'])) { $id = $query['tg']; break; }
             }
             if ($id === null) {
                 if (!preg_match('/N°\s*match\s*(\d{1,30})/u', self::text($row), $number)) throw new RuntimeException('results_unavailable');
@@ -280,7 +346,7 @@ final class DashboardLeLocleResults
             if (isset($seen[$id])) continue;
             $seen[$id] = true;
             $results[] = ['id'=>$id, 'home'=>$home, 'away'=>$away, 'startsAt'=>$when->format('Y-m-d\TH:i:sP'), 'timeConfirmed'=>$hasTime,
-                'scoreHome'=>(int)$scoreHome, 'scoreAway'=>(int)$scoreAway, 'league'=>$league, 'url'=>self::DETAILS_URL];
+                'scoreHome'=>(int)$scoreHome, 'scoreAway'=>(int)$scoreAway, 'league'=>$league, 'url'=>$team['detailsUrl']];
         }
         usort($results, static fn (array $a, array $b): int => strtotime($b['startsAt']) <=> strtotime($a['startsAt']) ?: strcmp($b['id'], $a['id']));
         return array_slice($results, 0, 3);
@@ -289,12 +355,12 @@ final class DashboardLeLocleResults
     private static function text(?DOMNode $node): string { return trim(preg_replace('/\s+/u', ' ', str_replace("\u{00A0}", ' ', $node?->textContent ?? '')) ?? ''); }
     private static function hasClass(DOMElement $node, string $class): bool { return in_array($class, preg_split('/\s+/', $node->getAttribute('class')) ?: [], true); }
     private static function nodes(DOMXPath $xpath, DOMNode $context, string $class): array { return iterator_to_array($xpath->query('.//*[contains(concat(" ",normalize-space(@class)," ")," '.$class.' ")]', $context) ?: []); }
-    private static function owner(string $value): bool { return preg_match('/^FC Le Locle(?:\s*\(Jun\.?\s*A\))?$/iu', $value) === 1; }
 
     private static function requestResults(string $url): array
     {
-        if ($url !== self::SOURCE || !function_exists('curl_init')) throw new RuntimeException('results_unavailable');
-        $curl = curl_init(self::SOURCE); if ($curl === false) throw new RuntimeException('results_unavailable');
+        $allowed = array_column(DashboardAnfTeams::TEAMS, 'detailsUrl');
+        if (!in_array($url, $allowed, true) || !function_exists('curl_init')) throw new RuntimeException('results_unavailable');
+        $curl = curl_init($url); if ($curl === false) throw new RuntimeException('results_unavailable');
         $body = ''; $tooLarge = false;
         curl_setopt_array($curl, [CURLOPT_FOLLOWLOCATION=>false, CURLOPT_PROTOCOLS=>CURLPROTO_HTTPS, CURLOPT_CONNECTTIMEOUT_MS=>3000, CURLOPT_TIMEOUT_MS=>8000,
             CURLOPT_SSL_VERIFYPEER=>true, CURLOPT_SSL_VERIFYHOST=>2, CURLOPT_MAXFILESIZE=>self::MAX_BYTES, CURLOPT_ENCODING=>'',
@@ -319,15 +385,15 @@ final class DashboardLeLocleResults
         if (!is_array($state) || !is_numeric($state['attemptAt'] ?? null) || !is_finite((float)$state['attemptAt']) || !is_bool($state['failed'] ?? null)) return [];
         $sample=$state['sample'] ?? null;
         if ($sample!==null) {
-            if (!is_array($sample) || !is_string($sample['checkedAt'] ?? null) || !preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/',$sample['checkedAt']) || strtotime($sample['checkedAt'])===false
+            if (!is_array($sample) || ($sample['teamId'] ?? DashboardAnfTeams::DEFAULT_ID) !== $this->team['id'] || !is_string($sample['checkedAt'] ?? null) || !preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/',$sample['checkedAt']) || strtotime($sample['checkedAt'])===false
                 || gmdate('Y-m-d\TH:i:s\Z',strtotime($sample['checkedAt']))!==$sample['checkedAt'] || !is_array($sample['results'] ?? null) || count($sample['results'])>3) return [];
             $seen=[];
             foreach ($sample['results'] as $row) {
                 if (!is_array($row) || !is_string($row['id'] ?? null) || !preg_match('/^\d{1,30}$/',$row['id']) || isset($seen[$row['id']])
-                    || !is_string($row['home'] ?? null) || !is_string($row['away'] ?? null) || (int)self::owner($row['home'])+(int)self::owner($row['away'])!==1
+                    || !is_string($row['home'] ?? null) || !is_string($row['away'] ?? null) || (int)DashboardAnfTeams::owner($row['home'], $this->team['id'])+(int)DashboardAnfTeams::owner($row['away'], $this->team['id'])!==1
                     || !is_string($row['startsAt'] ?? null) || strtotime($row['startsAt'])===false || !is_bool($row['timeConfirmed'] ?? null)
                     || !is_int($row['scoreHome'] ?? null) || $row['scoreHome']<0 || $row['scoreHome']>99 || !is_int($row['scoreAway'] ?? null) || $row['scoreAway']<0 || $row['scoreAway']>99
-                    || !is_string($row['league'] ?? null) || ($row['url'] ?? null)!==self::DETAILS_URL) return [];
+                    || !is_string($row['league'] ?? null) || ($row['url'] ?? null)!==$this->team['detailsUrl']) return [];
                 $seen[$row['id']]=true;
             }
         }
@@ -354,10 +420,13 @@ function dashboardLeLocleRespond(): void
         if (isset($policy['error'])) echo json_encode(['error' => $policy['error']]);
         return;
     }
+    try { $teamId = DashboardAnfTeams::select($_GET); }
+    catch (Throwable) { http_response_code(400); echo '{"error":"team_not_allowed"}'; return; }
     try {
-        $service = new DashboardLeLocleFixtures(dirname(__DIR__).'/storage/app/private/dashboard-lelocle');
+        $directory = DashboardAnfTeams::cacheDirectory(dirname(__DIR__), $teamId);
+        $service = new DashboardLeLocleFixtures($directory, teamId: $teamId);
         $calendar = $service->snapshot();
-        $results = new DashboardLeLocleResults(dirname(__DIR__).'/storage/app/private/dashboard-lelocle/results');
+        $results = new DashboardLeLocleResults($directory.'/results', teamId: $teamId);
         echo json_encode([...$calendar, ...$results->snapshot()], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
     } catch (Throwable) {
         http_response_code(503);

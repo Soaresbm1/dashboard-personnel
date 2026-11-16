@@ -30,3 +30,14 @@ test('Local polling pauses on hidden pages and disposal ignores a late extension
   bridge.dispose(); reply(packet); await new Promise(resolve => setImmediate(resolve));
   assert.equal(received, 0); assert.equal(stopped, true);
 });
+
+test('Futsal reads are explicitly bound to one allowlisted team and old or wrong-team extension data is never marked ready', async () => {
+  for (const response of [{ ...packet }, { ...packet, teamId: '68914' }, { ...packet, teamId: '74009' }]) {
+    let call;
+    const win = { chrome: { runtime: { sendMessage(id, message, callback) { call = message; callback(response); } } } };
+    const value = await requestFootballExtension({ window: win, teamId: '74009' });
+    assert.deepEqual(call, { type: 'GET_RESULTS', teamId: '74009' });
+    assert.equal(value.resultsState, response.teamId === '74009' ? 'ready' : 'unavailable');
+  }
+  assert.equal((await requestFootballExtension({ teamId: '999999', window: {} })).installed, false);
+});

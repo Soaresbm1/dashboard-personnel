@@ -2,9 +2,10 @@
   'use strict';
   const reader = globalThis.DashboardFootballReader;
   if (!reader?.isSourceUrl(location.href) || window.top !== window) return;
+  const teamId = reader.teamFromUrl(location.href).id;
   let requestId = null, deadlineAt = 0, observer = null, timer = null, pending = false, done = false, lastCandidate = '', stableAt = 0;
   const startedAt = Date.now();
-  const send = message => chrome.runtime.sendMessage(message);
+  const send = message => chrome.runtime.sendMessage({ ...message, teamId });
   function stop() { done = true; observer?.disconnect(); clearTimeout(timer); }
   async function attempt() {
     if (done || pending) return;
@@ -12,13 +13,13 @@
     try {
       if (!requestId) {
         const response = await send({ type: 'SOURCE_HELLO' });
-        if (response?.capture) { requestId = response.requestId; deadlineAt = response.deadlineAt; }
+        if (response?.capture && response.teamId === teamId) { requestId = response.requestId; deadlineAt = response.deadlineAt; }
         else if (Date.now() - startedAt > 20_000) { stop(); return; }
       }
       if (requestId) {
-        if (!reader.isSourceUrl(location.href)) { stop(); return; }
+        if (!reader.isSourceUrl(location.href, teamId)) { stop(); return; }
         try {
-          const results = reader.readResults(document, Date.now());
+          const results = reader.readResults(document, Date.now(), teamId);
           const candidate = JSON.stringify(results);
           if (candidate !== lastCandidate) { lastCandidate = candidate; stableAt = Date.now(); }
           // Let any dynamically hydrated score table settle before accepting an empty/partial view.

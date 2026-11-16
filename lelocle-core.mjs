@@ -1,4 +1,5 @@
 import { readFootballCache, upcomingFootballMatches } from './football-core.mjs';
+import { anfTeam, isAnfTeamName } from './anf-teams.mjs';
 export { upcomingFootballMatches as upcomingLeLocleMatches, footballMatchWhen as leLocleMatchWhen } from './football-core.mjs';
 export const LELOCLE_URL = 'https://intranet.isp-spi.ch/dashboard-lelocle-fixtures.php';
 export const LELOCLE_SOURCE_URL = 'https://matchcenter-anf.football.ch/default.aspx?a=pt&lng=2&oid=15&t=34107&v=919';
@@ -8,11 +9,10 @@ export const LELOCLE_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
 export const LELOCLE_RESULTS_MAX_AGE_MS = 366 * 24 * 60 * 60_000;
 const clean = value => typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, 160) : '';
 const key = value => clean(value).normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
-const isLeLocleTeam = value => key(value).replace(/\s*\(jun\.?\s*a\)$/, '').trim() === 'fc le locle';
 const unescapeIcs = value => value.replace(/\\([nN,;\\])/g, (_, char) => /n/i.test(char) ? '\n' : char);
 const localParts = value => Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Zurich', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(value)).map(part => [part.type, part.value]));
 
-export function safeLeLocleUrl(value) { return value === LELOCLE_SOURCE_URL ? value : null; }
+export function safeLeLocleUrl(value, teamId = '34107') { return value === anfTeam(teamId).sourceUrl ? value : null; }
 
 // TZsfv is the official feed's CET/CEST timezone, equivalent to Europe/Zurich.
 export function parseLeLocleDate(value, parameters = '') {
@@ -35,10 +35,11 @@ export function parseLeLocleDate(value, parameters = '') {
     : { startsAt: new Date(Date.UTC(+year, +month - 1, +day, 12)).toISOString(), timeConfirmed: false };
 }
 
-export function parseLeLocleCalendar(raw) {
+export function parseLeLocleCalendar(raw, teamId = '34107') {
+  const team = anfTeam(teamId), isOwner = value => isAnfTeamName(value, teamId);
   if (typeof raw !== 'string' || raw.length > 524_288) throw new Error('Invalid fixture calendar');
   const text = raw.replace(/^\uFEFF/, '').replace(/\r+\n/g, '\n').replace(/\r/g, '\n').replace(/\n[ \t]/g, '');
-  if (!/^BEGIN:VCALENDAR\n/.test(text) || !/\nEND:VCALENDAR\s*$/.test(text) || !/^X-WR-CALNAME:FC Le Locle - Juniors A$/m.test(text)) throw new Error('Unexpected fixture calendar');
+  if (!/^BEGIN:VCALENDAR\n/.test(text) || !/\nEND:VCALENDAR\s*$/.test(text) || text.split('\n').filter(line => line.startsWith('X-WR-CALNAME:')).join('\n') !== `X-WR-CALNAME:${team.calendarName}`) throw new Error('Unexpected fixture calendar');
   const events = new Map(); let current = null, count = 0;
   for (const line of text.split('\n')) {
     if (line === 'BEGIN:VEVENT') {
@@ -61,31 +62,33 @@ export function parseLeLocleCalendar(raw) {
   const matches = [];
   for (const event of events.values()) {
     const teams = unescapeIcs(event.SUMMARY.value).split(/\s+[-–—]\s+/).map(clean);
-    if (teams.length !== 2 || !teams.every(Boolean) || teams.filter(isLeLocleTeam).length !== 1) throw new Error('Unexpected fixture team');
+    if (teams.length !== 2 || !teams.every(Boolean) || teams.filter(isOwner).length !== 1) throw new Error('Unexpected fixture team');
     const description = unescapeIcs(event.DESCRIPTION?.value || '');
     if (event.STATUS?.value.toUpperCase() === 'CANCELLED' || /\b(?:annule|annulee|renvoye|renvoyee|reporte|reportee)\b/.test(key(description))) continue;
     const when = parseLeLocleDate(event.DTSTART.value, event.DTSTART.parameters);
-    const league = clean(description.split('\n')[0]) || 'Juniors A';
-    matches.push({ id: event.id, ...when, home: teams[0], away: teams[1], league, url: LELOCLE_SOURCE_URL });
+    const league = clean(description.split('\n')[0]) || team.league;
+    matches.push({ id: event.id, ...when, home: teams[0], away: teams[1], league, url: team.sourceUrl });
   }
   return matches.sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt)).slice(0, 100);
 }
 
-export function parseLeLocleFeed(body, now = Date.now()) {
+export function parseLeLocleFeed(body, now = Date.now(), teamId = '34107') {
+  anfTeam(teamId);
   const at = typeof body?.checkedAt === 'string' && /(?:Z|[+-]\d{2}:\d{2})$/.test(body.checkedAt) ? Date.parse(body.checkedAt) : NaN;
-  if (body?.schemaVersion !== 1 || body.teamId !== '34107' || typeof body.checkFailed !== 'boolean' || !Number.isFinite(at) || at > now + 60_000 || now - at > LELOCLE_CACHE_MAX_AGE_MS) throw new Error('Invalid fixture feed');
+  if (body?.schemaVersion !== 1 || body.teamId !== teamId || typeof body.checkFailed !== 'boolean' || !Number.isFinite(at) || at > now + 60_000 || now - at > LELOCLE_CACHE_MAX_AGE_MS) throw new Error('Invalid fixture feed');
   const resultsAt = typeof body.resultsCheckedAt === 'string' && /(?:Z|[+-]\d{2}:\d{2})$/.test(body.resultsCheckedAt) ? Date.parse(body.resultsCheckedAt) : null;
-  return { at, stale: body.checkFailed, matches: parseLeLocleCalendar(body.calendar),
-    ...normalizeLeLocleResults({ resultsState: body.resultsState, resultsAt, resultsFailed: body.resultsCheckFailed, results: body.results }, now) };
+  return { at, stale: body.checkFailed, matches: parseLeLocleCalendar(body.calendar, teamId),
+    ...normalizeLeLocleResults({ resultsState: body.resultsState, resultsAt, resultsFailed: body.resultsCheckFailed, results: body.results }, now, teamId) };
 }
 
-export function readLeLocleCache(raw, now = Date.now()) {
-  const base = readFootballCache(raw, now, safeLeLocleUrl, LELOCLE_CACHE_MAX_AGE_MS);
+export function readLeLocleCache(raw, now = Date.now(), teamId = '34107') {
+  const base = readFootballCache(raw, now, value => safeLeLocleUrl(value, teamId), LELOCLE_CACHE_MAX_AGE_MS);
   if (!base) return null;
-  return { ...base, ...normalizeLeLocleResults(JSON.parse(raw), now) };
+  if (base.matches.some(row => [row.home, row.away].filter(name => isAnfTeamName(name, teamId)).length !== 1)) return null;
+  return { ...base, ...normalizeLeLocleResults(JSON.parse(raw), now, teamId) };
 }
 
-function normalizeLeLocleResults(source, now) {
+function normalizeLeLocleResults(source, now, teamId = '34107') {
   const unavailable = { resultsState: 'unavailable', resultsAt: null, resultsFailed: true, results: [] };
   if (source.resultsState !== 'ready' || !Number.isFinite(source.resultsAt) || source.resultsAt > now + 60_000 || now - source.resultsAt > LELOCLE_RESULTS_MAX_AGE_MS || typeof source.resultsFailed !== 'boolean' || !Array.isArray(source.results) || source.results.length > 100) return unavailable;
   const results = [], seen = new Set();
@@ -93,9 +96,9 @@ function normalizeLeLocleResults(source, now) {
     if (!row || typeof row.id !== 'string' || !/^\d{1,30}$/.test(row.id) || seen.has(row.id) || typeof row.startsAt !== 'string' || !/(?:Z|[+-]\d{2}:\d{2})$/.test(row.startsAt)
         || !Number.isFinite(Date.parse(row.startsAt)) || Date.parse(row.startsAt) > now || typeof row.timeConfirmed !== 'boolean'
         || !Number.isInteger(row.scoreHome) || row.scoreHome < 0 || row.scoreHome > 99 || !Number.isInteger(row.scoreAway) || row.scoreAway < 0 || row.scoreAway > 99
-        || !clean(row.home) || !clean(row.away) || [row.home, row.away].filter(isLeLocleTeam).length !== 1 || !clean(row.league)) return unavailable;
+        || !clean(row.home) || !clean(row.away) || [row.home, row.away].filter(name => isAnfTeamName(name, teamId)).length !== 1 || !clean(row.league) || !safeLeLocleUrl(row.url, teamId)) return unavailable;
     results.push({ id: row.id, startsAt: new Date(row.startsAt).toISOString(), timeConfirmed: row.timeConfirmed,
-      home: clean(row.home), away: clean(row.away), scoreHome: row.scoreHome, scoreAway: row.scoreAway, league: clean(row.league), url: safeLeLocleUrl(row.url) });
+      home: clean(row.home), away: clean(row.away), scoreHome: row.scoreHome, scoreAway: row.scoreAway, league: clean(row.league), url: safeLeLocleUrl(row.url, teamId) });
     seen.add(row.id);
   }
   return { resultsState: 'ready', resultsAt: source.resultsAt, resultsFailed: source.resultsFailed,
@@ -121,10 +124,11 @@ export function mergeLeLocleSnapshot(previous, next, now = Date.now()) {
   return merged;
 }
 
-export function mergeLeLocleExtension(snapshot, packet, now = Date.now()) {
+export function mergeLeLocleExtension(snapshot, packet, now = Date.now(), teamId = '34107') {
   if (!snapshot || packet?.installed !== true || packet.resultsState !== 'ready') return snapshot;
+  if (packet.teamId !== undefined ? packet.teamId !== teamId : teamId !== '34107') return snapshot;
   const at = typeof packet.resultsCheckedAt === 'string' && /(?:Z|[+-]\d{2}:\d{2})$/.test(packet.resultsCheckedAt) ? Date.parse(packet.resultsCheckedAt) : null;
-  const results = normalizeLeLocleResults({ resultsState: packet.resultsState, resultsAt: at, resultsFailed: packet.resultsCheckFailed, results: packet.results }, now);
+  const results = normalizeLeLocleResults({ resultsState: packet.resultsState, resultsAt: at, resultsFailed: packet.resultsCheckFailed, results: packet.results }, now, teamId);
   if (results.resultsState !== 'ready') return snapshot;
   return mergeLeLocleSnapshot(snapshot, { ...snapshot, ...results }, now);
 }

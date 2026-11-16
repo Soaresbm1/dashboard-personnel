@@ -90,6 +90,38 @@ try {
     }
     verifyLeLocle(DashboardLeLocleFixtures::httpPolicy('GET', '')['status'] === 200, 'anonymous direct read');
     verifyLeLocle(DashboardLeLocleFixtures::httpPolicy('GET', 'https://evil.test')['status'] === 403, 'reject foreign origin');
+    verifyLeLocle(DashboardAnfTeams::select([]) === '34107', 'legacy default team retained');
+    verifyLeLocle(array_column(DashboardAnfTeams::TEAMS, 'id') === ['34107','74009','68914'], 'only three approved team IDs');
+    verifyLeLocle(DashboardAnfTeams::calendarSource() === DashboardLeLocleFixtures::SOURCE, 'legacy calendar source unchanged');
+    verifyLeLocle(DashboardAnfTeams::get()['detailsUrl'] === DashboardLeLocleResults::DETAILS_URL, 'legacy result source unchanged');
+    verifyLeLocle(DashboardAnfTeams::cacheDirectory('/app') === '/app/storage/app/private/dashboard-lelocle', 'legacy cache directory retained');
+    foreach ([['team'=>'unknown'], ['team'=>['74009']], ['team'=>'74009','url'=>'https://evil.test'], ['url'=>'https://evil.test'], ['team'=>74009]] as $query) {
+        $threw = false; try { DashboardAnfTeams::select($query); } catch (RuntimeException $error) { $threw = $error->getMessage() === 'team_not_allowed'; }
+        verifyLeLocle($threw, 'invalid selector is not a URL source');
+    }
+    foreach (['74009','68914'] as $teamId) {
+        $team = DashboardAnfTeams::get($teamId);
+        verifyLeLocle(DashboardAnfTeams::select(['team'=>$teamId]) === $teamId, 'allow configured team selector');
+        verifyLeLocle(DashboardAnfTeams::cacheDirectory('/app', $teamId) === '/app/storage/app/private/dashboard-anf/'.$teamId, 'isolated team cache directory');
+        $teamCalendar = leLocleCalendar($team['calendarName']);
+        verifyLeLocle(DashboardLeLocleFixtures::validateCalendar($teamCalendar, $teamId) === $teamCalendar, 'configured team calendar validated');
+        expectUnavailable(static fn () => DashboardLeLocleFixtures::validateCalendar($empty, $teamId), 'foreign-team calendar rejected');
+        $teamCalls = 0; $teamNow = $now; $teamMode = 'good';
+        $teamClock = static function () use (&$teamNow): float { return $teamNow; };
+        $teamRequest = static function (string $url) use (&$teamCalls, &$teamMode, $teamCalendar, $teamId): array {
+            verifyLeLocle($url === DashboardAnfTeams::calendarSource($teamId), 'selected team source is fixed'); $teamCalls++;
+            if ($teamMode === 'failed') throw new RuntimeException('unavailable');
+            return ['status'=>200, 'body'=>$teamCalendar];
+        };
+        $teamDir = leLocleTestDirectory();
+        $teamService = new DashboardLeLocleFixtures($teamDir, $teamRequest, $teamClock, $teamId);
+        $teamFirst = $teamService->snapshot();
+        verifyLeLocle($teamFirst['teamId'] === $teamId && $teamFirst['calendar'] === $teamCalendar && !$teamFirst['checkFailed'], 'selected team has its own response');
+        $teamMode = 'failed'; $teamNow += 900; $teamFailed = $teamService->snapshot();
+        verifyLeLocle($teamFailed['checkedAt'] === $teamFirst['checkedAt'] && $teamFailed['checkFailed'] && $teamCalls === 2, 'selected team failed refresh preserves date');
+        $wrongSource = new DashboardLeLocleFixtures($teamDir, static fn (): array=>['status'=>200,'body'=>$empty], $teamClock);
+        verifyLeLocle($wrongSource->snapshot()['teamId'] === '34107', 'calendar state from a different team cannot be reused');
+    }
     // Synthetic fixture markup mirrors the observed official team calendar structure.
     function resultsRow(string $id, string $date, string $home, string $away, string $a = '2', string $b = '1', string $note = ''): string {
         return '<div class="list-group-item"><div class="row spiel"><div class="date"><span>'.$date.'</span>16:00</div>'
@@ -165,6 +197,44 @@ try {
     verifyLeLocle($newerService->seedFromVerifiedHtml(resultsPage(''),$captureAt)===$newerResults,'newer genuine source data preserved during repeated install');
     $invalidCapture=false; try{$seedService->seedFromVerifiedHtml($resultHtml,$resultNow+3600);}catch(RuntimeException){$invalidCapture=true;}
     verifyLeLocle($invalidCapture,'future capture rejected');
+    foreach (['74009','68914'] as $teamId) {
+        $team = DashboardAnfTeams::get($teamId);
+        $teamHtml = str_replace(['Equipe - Juniors A','championnat Juniors A','FC Le Locle', 'v=919&amp;t=34107'],
+            ['Equipe - '.$team['category'], 'championnat '.$team['category'], $team['name'], 'v='.$team['clubId'].'&amp;t='.$teamId],
+            resultsPage(resultsRow('41','Di 08.11.2026','FC Le Locle','Fixture Futsal','0','3')));
+        $alias = $teamId === '74009' ? 'FC Le Parc (SFPL)' : 'FC Le Parc 2 (1 L Futsal)';
+        $teamHtml = str_replace(['<button id="ddmTeam">','</button>','<div id="fixture_tbResultate"', '>'.$team['name'].'<'],
+            ['<h3>','</h3>','<div id="club_tbResultate" class="nisListeRD"></div><div id="fixture_tbResultate"', '>'.$alias.'<'], $teamHtml);
+        $rows = DashboardLeLocleResults::parseResults($teamHtml, $resultNow, $teamId);
+        verifyLeLocle(count($rows) === 1 && $rows[0]['home'] === $alias && $rows[0]['scoreHome'] === 0 && $rows[0]['url'] === $team['detailsUrl'], 'selected team completed result, observed heading, empty club calendar and fixed link');
+        $ambiguous = str_replace('<div id="club_tbResultate" class="nisListeRD"></div>', '<div id="club_tbResultate" class="nisListeRD">'.resultsRow('42','Di 08.11.2026',$alias,'Fixture Futsal').'</div>', $teamHtml);
+        $rejected = false; try { DashboardLeLocleResults::parseResults($ambiguous, $resultNow, $teamId); } catch (RuntimeException) { $rejected = true; }
+        verifyLeLocle($rejected, 'two populated calendars cannot be combined');
+        $wrongHeading = str_replace('<h3>Equipe - '.$team['category'].'</h3>', '<h3>Equipe - Wrong League</h3>', $teamHtml);
+        $rejected = false; try { DashboardLeLocleResults::parseResults($wrongHeading, $resultNow, $teamId); } catch (RuntimeException) { $rejected = true; }
+        verifyLeLocle($rejected, 'populated result calendar requires exact selected team heading');
+        $crossed = false; try { DashboardLeLocleResults::parseResults($teamHtml, $resultNow, $teamId === '74009' ? '68914' : '74009'); } catch (RuntimeException) { $crossed = true; }
+        verifyLeLocle($crossed, 'other futsal team cannot be accepted');
+        $selectedDir = leLocleTestDirectory(); $selectedCalls = 0;
+        $selectedRequest = static function (string $url) use (&$selectedCalls, $team): array { verifyLeLocle($url === $team['detailsUrl'], 'fixed selected result URL'); $selectedCalls++; return ['status'=>403,'body'=>'denied']; };
+        $selectedResults = new DashboardLeLocleResults($selectedDir, $selectedRequest, $resultClock, $teamId);
+        $selectedSeed = $selectedResults->seedFromVerifiedHtml($teamHtml, $resultNow - 300);
+        verifyLeLocle(count($selectedSeed['results']) === 1 && $selectedSeed['resultsCheckedAt'] === gmdate('Y-m-d\TH:i:s\Z', (int)($resultNow-300)), 'selected browser seed retains capture time');
+        verifyLeLocle($selectedResults->snapshot() === $selectedSeed && $selectedCalls === 1, 'selected source failure retains only its own results');
+        $wrongTeamResults = new DashboardLeLocleResults($selectedDir, static fn (): array=>['status'=>403,'body'=>'denied'], $resultClock, $teamId === '74009' ? '68914' : '74009');
+        verifyLeLocle($wrongTeamResults->snapshot()['resultsState'] === 'unavailable', 'other team state is not reused even in a shared accidental directory');
+    }
+    foreach (['FC Le Parc 2','FC Le Parc II','FC Le Parc (Jun.A)'] as $wrongOwner) verifyLeLocle(!DashboardAnfTeams::owner($wrongOwner, '74009'), 'first futsal team owner is exact');
+    verifyLeLocle(DashboardAnfTeams::owner('FC Le Parc (SFPL)', '74009') && !DashboardAnfTeams::owner('FC Le Parc 2 (1 L Futsal)', '74009'), 'first official alias belongs only to its own team');
+    verifyLeLocle(DashboardAnfTeams::owner('FC Le Parc 2 (1 L Futsal)', '68914') && !DashboardAnfTeams::owner('FC Le Parc (SFPL)', '68914'), 'second official alias belongs only to its own team');
+    verifyLeLocle(DashboardAnfTeams::owner('FC Le Parc 2','68914') && !DashboardAnfTeams::owner('FC Le Parc','68914'), 'second futsal team owner is exact');
+    $priorGet = $_GET; $priorServer = $_SERVER;
+    try {
+        $_GET = ['team'=>['74009']]; $_SERVER['REQUEST_METHOD'] = 'GET'; unset($_SERVER['HTTP_ORIGIN']);
+        ob_start(); dashboardLeLocleRespond(); $invalidBody = ob_get_clean();
+        verifyLeLocle(http_response_code() === 400 && $invalidBody === '{"error":"team_not_allowed"}', 'HTTP invalid team is rejected before source I/O');
+    } finally { $_GET = $priorGet; $_SERVER = $priorServer; }
+    echo "ANF_MULTITEAM_TESTS_PASSED\n";
     echo "LELOCLE_RESULTS_TESTS_PASSED\n";
     echo "LELOCLE_PROXY_TESTS_PASSED\n";
 } finally {

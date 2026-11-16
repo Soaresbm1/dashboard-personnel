@@ -156,6 +156,7 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .lelocle-summary dt > span { color: var(--blue); }
 .benfica-count { color: var(--muted); font-size: 9px; font-weight: 400; }
 .sports-clubs dt > a { font-size: 9px; text-decoration: underline; text-underline-offset: 3px; }
+.anf-team-select { flex: 1; min-width: 0; max-width: calc(100% - 25px); padding: 0 2px 0 0; border: 0; background: transparent; color: #4b62cc; font: inherit; font-size: 10px; font-weight: 600; text-overflow: ellipsis; cursor: pointer; }
 .benfica-matches { list-style: none; margin: 3px 0 0; padding: 0; }
 .benfica-match { min-width: 0; padding: 3px 0; }
 .benfica-match + .benfica-match { border-top: 1px solid var(--line); }
