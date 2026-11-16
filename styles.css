@@ -226,6 +226,7 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .weather-summary dt { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 2px 8px; }
 .weather-source { font-size: 9px; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
 .weather-value { display: flex; align-items: baseline; gap: 10px; }
+#weather-temperature { flex-shrink: 0; white-space: nowrap; }
 .weather-condition { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 400; letter-spacing: 0; }
 .weather-summary[data-state="stale"] .summary-value { color: var(--muted); }
 .sort-note { flex-shrink: 0; margin-left: auto; color: var(--muted); font-size: 10px; line-height: 1.5; }
