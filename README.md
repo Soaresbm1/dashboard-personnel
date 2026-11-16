@@ -50,6 +50,8 @@ L’extension contrôle les trois pages publiques tous les cinq jours lorsque Ed
 
 Le relais accepte uniquement `?team=34107`, `?team=74009` ou `?team=68914` ; sans paramètre, il conserve le comportement Juniors A. Les calendriers, résultats, liens et réponses de l’extension sont validés pour l’équipe demandée. Les caches des trois équipes restent séparés ; une réponse en retard d’une autre sélection ne peut pas remplacer le bloc courant.
 
+Le bloc ANF passe automatiquement à l’équipe suivante toutes les dix secondes. Le sélecteur reste disponible et seul le choix manuel est conservé au rechargement. La rotation se suspend pendant le survol ou l’utilisation au clavier du bloc, ainsi que dans un onglet masqué ; elle reprend avec un délai complet de dix secondes. Les changements automatiques ne produisent pas d’annonces vocales répétées. Les données sont réutilisées entre les passages : le contrôle réseau reste limité à une tentative par équipe toutes les quinze minutes, sans annuler une lecture en cours lors d’un changement d’équipe. L’extension garde son échéance de cinq jours.
+
 Validation : `npm run test:lelocle` pour les flux ICS et le comportement du bloc ; `npm run test:benfica` vérifie aussi le moteur d’affichage partagé. Le relais PHP dispose d’un test isolé exécuté avant son installation sur le serveur : `php server/tests/lelocle-proxy.test.php server/dashboard-lelocle-fixtures.php`.
 
 ## Courrier, accès rapides et actualités internes

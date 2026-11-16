@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { LELOCLE_URL, LELOCLE_SOURCE_URL, LELOCLE_CACHE_KEY, LELOCLE_INTERVAL_MS,
   parseLeLocleCalendar, parseLeLocleFeed, parseLeLocleDate, upcomingLeLocleMatches, leLocleMatchWhen, safeLeLocleUrl, selectLeLocleView, readLeLocleCache, mergeLeLocleSnapshot, mergeLeLocleExtension } from '../lelocle-core.mjs';
-import { initializeLeLocleFixtures } from '../lelocle.mjs';
+import { initializeLeLocleFixtures, ANF_ROTATION_INTERVAL_MS } from '../lelocle.mjs';
 import { ANF_TEAMS, anfTeam, anfCacheKey } from '../anf-teams.mjs';
 
 const NOW = Date.parse('2026-11-09T12:00:00Z');
@@ -48,7 +48,15 @@ test('No feed URL can override the fixed official team calendar link', () => {
 });
 
 function harness(options = {}) {
-  const nodes = new Map(), stored = new Map(), network = [], listeners = new Map();
+  const nodes = new Map(), stored = new Map(), network = [], listeners = new Map(), documentListeners = new Map(), timers = new Map();
+  let timerId = 0;
+  const events = output => {
+    const callbacks = new Map();
+    return { addEventListener(name, callback) {
+      if (!callbacks.has(name)) callbacks.set(name, new Set()); callbacks.get(name).add(callback);
+      output.set(name, event => [...callbacks.get(name)].forEach(fn => fn(event)));
+    }, removeEventListener(name, callback) { callbacks.get(name)?.delete(callback); if (!callbacks.get(name)?.size) output.delete(name); } };
+  };
   if (options.cached) stored.set(LELOCLE_CACHE_KEY, options.cached);
   if (options.selected) stored.set('dashboard.anf.selected.v1', options.selected);
   let clock = NOW, settings;
@@ -62,15 +70,17 @@ function harness(options = {}) {
   }
   for (const id of ['summary-lelocle', 'lelocle-mode', 'lelocle-extension-status', 'lelocle-matches', 'lelocle-status', 'lelocle-warning']) nodes.set(id, new Element());
   if (options.selector) for (const id of ['anf-team', 'anf-team-source']) nodes.set(id, new Element());
-  const doc = { hidden: false, getElementById: id => nodes.get(id), createElement: () => new Element(), createDocumentFragment: () => Object.assign(new Element(), { fragment: true }), addEventListener() {}, removeEventListener() {} };
-  const win = { navigator: { onLine: !options.offline }, addEventListener: (name, callback) => listeners.set(name, callback), removeEventListener: name => listeners.delete(name) };
+  const doc = { hidden: false, getElementById: id => nodes.get(id), createElement: () => new Element(), createDocumentFragment: () => Object.assign(new Element(), { fragment: true }), ...events(documentListeners) };
+  const win = { navigator: { onLine: !options.offline }, ...events(listeners) };
   const instance = initializeLeLocleFixtures({ document: doc, window: win, now: () => clock,
-    storage: { getItem: key => stored.get(key), setItem: (key, value) => stored.set(key, value) },
+    storage: options.storageBlocked ? { getItem() { throw Error('blocked'); }, setItem() { throw Error('blocked'); } } : { getItem: key => stored.get(key), setItem: (key, value) => stored.set(key, value) },
+    setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; }, clearTimeout: id => timers.delete(id),
     extensionBridgeFactory: options.extensionBridgeFactory || (() => ({ dispose() {} })),
     autoRefreshFactory: config => { settings = config; return { start() {}, dispose() {} }; },
     fetch: async (url, request) => { network.push({ url, request }); return options.fetch ? options.fetch(url, request) : new Response(JSON.stringify(feed(calendar())), { status: 200 }); }
   });
-  return { nodes, stored, network, instance, listeners, get settings() { return settings; }, advance: value => { clock += value; } };
+  return { nodes, stored, network, instance, listeners, doc, documentListeners, timers, get settings() { return settings; }, advance: value => { clock += value; },
+    async rotate() { const [id, timer] = timers.entries().next().value; timers.delete(id); clock += timer.delay; timer.callback(); await settle(); } };
 }
 const text = node => [node.textContent, ...node.children.map(text)].join(' ');
 
@@ -276,4 +286,58 @@ test('A saved futsal selection is restored, while a Le Locle cache or legacy ext
   const snapshot = parseLeLocleFeed(feed(teamCalendar('74009'), { teamId: '74009' }), NOW, '74009');
   assert.equal(mergeLeLocleExtension(snapshot, { installed: true, resultsState: 'ready', resultsCheckedAt: new Date(NOW).toISOString(), resultsCheckFailed: false, results: [] }, NOW, '74009'), snapshot);
   assert.equal(mergeLeLocleExtension(snapshot, { installed: true, teamId: '68914', resultsState: 'ready', resultsCheckedAt: new Date(NOW).toISOString(), resultsCheckFailed: false, results: [] }, NOW, '74009'), snapshot);
+});
+
+const selectedTeamFeed = url => {
+  const id = new URL(url).searchParams.get('team') || '34107';
+  return new Response(JSON.stringify(feed(id === '34107' ? calendar(event()) : teamCalendar(id), { teamId: id })));
+};
+test('Automatic rotation cycles every ten seconds, reuses each team feed and preserves only the manual preference', async () => {
+  const h = harness({ selector: true, fetch: selectedTeamFeed }); await settle();
+  try {
+    assert.equal([...h.timers.values()][0].delay, ANF_ROTATION_INTERVAL_MS);
+    for (const id of ['74009', '68914', '34107']) { await h.rotate(); assert.equal(h.nodes.get('anf-team').value, id); }
+    assert.equal(h.network.length, 3); assert.equal(h.stored.has('dashboard.anf.selected.v1'), false);
+    assert.equal(h.nodes.get('lelocle-status').attributes['aria-live'], 'off');
+    const select = h.nodes.get('anf-team'); select.value = '68914'; select.events.get('change')(); await settle();
+    assert.equal(h.stored.get('dashboard.anf.selected.v1'), '68914'); assert.equal(h.network.length, 3);
+    assert.equal(h.nodes.get('lelocle-status').attributes['aria-live'], 'polite');
+    assert.equal([...h.timers.values()][0].delay, 10_000);
+    await h.rotate(); assert.equal(select.value, '34107'); assert.equal(h.stored.get('dashboard.anf.selected.v1'), '68914');
+    h.advance(LELOCLE_INTERVAL_MS); await h.rotate(); assert.equal(h.network.length, 4);
+  } finally { h.instance.dispose(); }
+  assert.equal(h.timers.size, 0); assert.equal(h.documentListeners.has('visibilitychange'), false);
+});
+
+test('Rotation pauses while hidden or interacting, resumes with a full delay, and stops on final page disposal', async () => {
+  const h = harness({ selector: true, fetch: selectedTeamFeed }); await settle();
+  try {
+    const region = h.nodes.get('summary-lelocle');
+    h.doc.hidden = true; h.documentListeners.get('visibilitychange')(); assert.equal(h.timers.size, 0);
+    h.advance(60_000); h.doc.hidden = false; h.documentListeners.get('visibilitychange')();
+    assert.equal(h.nodes.get('anf-team').value, '34107'); assert.equal([...h.timers.values()][0].delay, 10_000);
+    region.events.get('mouseenter')(); assert.equal(h.timers.size, 0);
+    region.events.get('mouseleave')(); assert.equal(h.timers.size, 1);
+    region.events.get('focusin')(); assert.equal(h.timers.size, 0);
+    region.contains = element => element === h.nodes.get('anf-team');
+    region.events.get('focusout')({ relatedTarget: h.nodes.get('anf-team') }); assert.equal(h.timers.size, 0);
+    region.events.get('focusout')({ relatedTarget: null }); assert.equal([...h.timers.values()][0].delay, 10_000);
+    h.listeners.get('pagehide')({ persisted: true }); assert.equal(h.timers.size, 1);
+    h.listeners.get('pageshow')(); assert.equal(h.timers.size, 1);
+    h.listeners.get('pagehide')({ persisted: false }); assert.equal(h.timers.size, 0);
+    assert.equal(h.network.length, 1);
+  } finally { h.instance.dispose(); }
+});
+
+test('A rotation leaves a slow source read running and preserves cached data even when local storage is unavailable', async () => {
+  let finish;
+  const h = harness({ selector: true, storageBlocked: true, fetch: url => url === LELOCLE_URL ? new Promise(resolve => { finish = () => resolve(selectedTeamFeed(url)); }) : selectedTeamFeed(url) }); await settle();
+  try {
+    await h.rotate(); assert.equal(h.network[0].request.signal.aborted, false);
+    finish(); await settle();
+    assert.match(text(h.nodes.get('lelocle-matches')), /FC Le Parc/);
+    await h.rotate(); await h.rotate();
+    assert.equal(h.network.length, 3); assert.match(text(h.nodes.get('lelocle-matches')), /FC Le Locle/);
+    await h.rotate(); assert.equal(h.network.length, 3); assert.match(text(h.nodes.get('lelocle-matches')), /FC Le Parc/);
+  } finally { h.instance.dispose(); }
 });
