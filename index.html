@@ -106,14 +106,29 @@
             <p id="github-status" class="sr-only" role="status" aria-live="polite">Préparation du suivi GitHub…</p>
           </dd>
         </div>
-        <div id="summary-intranet-health" class="summary-item intranet-health-summary">
-          <dt>Intranet</dt>
-          <dd>
-            <span id="intranet-health" class="intranet-health" data-state="unknown" role="status" aria-live="polite">
-              <span class="health-symbol" aria-hidden="true"><svg class="icon health-online"><path d="m5 12 4 4L19 6"/></svg><svg class="icon health-error"><use href="#i-close"/></svg></span>
-              <span id="intranet-health-label">—</span>
-            </span>
-            <time id="intranet-health-time" class="health-checked" hidden></time>
+        <div id="tech-news-panel" class="summary-item intranet-health-summary tech-summary" role="region" aria-roledescription="carrousel" aria-labelledby="tech-news-title">
+          <dt class="tech-summary-heading"><span id="tech-news-title">Infos et statuts</span><button id="tech-news-refresh" type="button" class="icon-button" aria-label="Actualiser les infos et statuts" title="Actualiser les infos et statuts"><svg class="icon" aria-hidden="true"><use href="#i-reset"/></svg></button></dt>
+          <dd class="tech-summary-body">
+            <div id="tech-carousel" class="tech-carousel" role="group" tabindex="0" aria-label="Informations et statuts. Flèches gauche et droite pour parcourir." aria-live="off">
+              <div id="tech-intranet-slide" class="tech-slide tech-intranet-slide" role="group" aria-roledescription="diapositive" aria-label="Intranet">
+                <p class="tech-slide-kicker">Intranet</p>
+                <div id="summary-intranet-health" class="tech-intranet-status">
+                  <span id="intranet-health" class="intranet-health" data-state="unknown" role="status" aria-live="polite">
+                    <span class="health-symbol" aria-hidden="true"><svg class="icon health-online"><path d="m5 12 4 4L19 6"/></svg><svg class="icon health-error"><use href="#i-close"/></svg></span>
+                    <span id="intranet-health-label">—</span>
+                  </span>
+                  <time id="intranet-health-time" class="health-checked" hidden></time>
+                </div>
+              </div>
+              <div id="tech-carousel-slides" class="tech-carousel-slides"></div>
+            </div>
+            <div class="tech-carousel-controls" role="group" aria-label="Parcourir les infos et statuts">
+              <button id="tech-prev" class="tech-carousel-button" type="button" aria-label="Information précédente" aria-controls="tech-carousel" disabled><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+              <span id="tech-slide-position" class="tech-slide-position" role="status" aria-live="polite" aria-atomic="true">1 / 1</span>
+              <button id="tech-next" class="tech-carousel-button" type="button" aria-label="Information suivante" aria-controls="tech-carousel" disabled><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+            </div>
+            <p id="tech-news-warning" class="tech-news-warning" role="status" aria-live="polite" hidden></p>
+            <p id="tech-news-meta" class="tech-news-meta"></p>
           </dd>
         </div>
       </dl>
@@ -185,22 +200,6 @@
           <div id="news-items" class="scroll-list" role="region" aria-label="Dernière publication" tabindex="0" aria-busy="false"><p class="news-empty">La dernière publication apparaîtra ici.</p></div>
           <div class="connection-panel" hidden><button id="news-connect" class="button button-primary" type="button">Connecter les actualités</button></div>
           <footer class="panel-footer"><a href="https://intranet.isp-spi.ch/intranet" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir l’intranet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a><span id="news-last-updated"></span></footer>
-        </section>
-        <section id="tech-news-panel" class="panel" aria-labelledby="tech-news-title">
-          <header class="panel-header">
-            <div><h2 id="tech-news-title">Actualités tech</h2><p class="panel-account">Incidents et dernières nouvelles</p></div>
-            <button id="tech-news-refresh" type="button" class="icon-button" aria-label="Actualiser les actualités tech" title="Actualiser les actualités tech"><svg class="icon" aria-hidden="true"><use href="#i-reset"/></svg></button>
-          </header>
-          <ul id="tech-status-list" class="tech-status-list" aria-label="État des services Microsoft, OpenAI et Anthropic">
-            <li><a class="tech-status" data-state="unknown" href="https://status.cloud.microsoft/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer"><span class="tech-status-name">Microsoft</span><span class="tech-status-state">Non vérifié</span></a></li>
-            <li><a class="tech-status" data-state="unknown" href="https://status.openai.com/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer"><span class="tech-status-name">OpenAI</span><span class="tech-status-state">Non vérifié</span></a></li>
-            <li><a class="tech-status" data-state="unknown" href="https://status.claude.com/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer"><span class="tech-status-name">Anthropic</span><span class="tech-status-state">Non vérifié</span></a></li>
-          </ul>
-          <p id="tech-news-warning" class="tech-news-warning" role="status" aria-live="polite" hidden></p>
-          <div class="tech-news-scroll scroll-list" role="region" aria-label="Dernières actualités technologiques" tabindex="0">
-            <ul id="tech-news-list" class="tech-news-list" aria-busy="false"><li class="tech-news-empty">Chargement des dernières nouvelles…</li></ul>
-          </div>
-          <footer class="panel-footer"><span>Sources publiques</span><span id="tech-news-meta" role="status" aria-live="polite"></span></footer>
         </section>
       </div>
       <footer class="page-footer"><span>Actualisation automatique · services 1 min · GitHub 5 min · météo 15 min</span><span>Consultation en lecture seule</span></footer>

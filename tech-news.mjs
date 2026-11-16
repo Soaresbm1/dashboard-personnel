@@ -1,4 +1,5 @@
 import { createAutoRefresh } from './auto-refresh.mjs';
+import { initializeInfoCarousel } from './info-carousel.mjs';
 import { TECH_NEWS_URL, TECH_NEWS_INTERVAL_MS, TECH_NEWS_CACHE_KEY, SERVICES, serviceLabel, emptyService,
   parseTechSnapshot, parseStatuspage, mergeTechSnapshot, readTechCache, normalizeArticles, techDate } from './tech-news-core.mjs';
 
@@ -11,47 +12,56 @@ export function initializeTechNews(options = {}) {
   try { storage = options.storage || win.localStorage; } catch { /* Optional cache for public data only. */ }
   let snapshot = null, inFlight = false, disposed = false, lastAttemptAt = -Infinity, controller = null, timer = null;
   try { snapshot = readTechCache(storage?.getItem(TECH_NEWS_CACHE_KEY), now()); } catch { /* Keep working without local storage. */ }
-  let requestFailed = false, statusSignature = '', articleSignature = '';
+  let requestFailed = false;
+  const carousel = initializeInfoCarousel(doc), cards = new Map();
   function link(element, url) { element.href = url; element.target = '_blank'; element.rel = 'noopener noreferrer'; element.referrerPolicy = 'no-referrer'; }
   function render() {
     const at = now(), services = SERVICES.map(config => snapshot?.services.find(item => item.id === config.id) || emptyService(config));
     const articles = normalizeArticles(snapshot?.articles || [], at);
-    const key = JSON.stringify({ services, stale: services.map(service => service.checkFailed || !service.checkedAt || at - Date.parse(service.checkedAt) > (service.id === 'microsoft' ? 90 : 20) * 60_000) });
-    if (key !== statusSignature) {
-      const statuses = doc.createDocumentFragment();
-      for (const service of services) {
-        const config = SERVICES.find(item => item.id === service.id), row = doc.createElement('li'), anchor = doc.createElement('a');
-        const name = doc.createElement('span'), state = doc.createElement('span');
-        const stale = service.checkFailed || !service.checkedAt || at - Date.parse(service.checkedAt) > (service.id === 'microsoft' ? 90 : 20) * 60_000;
-        anchor.className = 'tech-status'; anchor.dataset.state = service.status; anchor.dataset.stale = String(stale);
-        name.className = 'tech-status-name'; name.textContent = service.name;
-        state.className = 'tech-status-state'; state.textContent = serviceLabel(service);
-        const description = `${service.name} : ${serviceLabel(service)}. ${stale && service.checkedAt ? 'Dernier statut connu. ' : ''}Relevé : ${techDate(service.checkedAt)}.${service.incident ? ` ${service.incident.title}.` : ''}${config.scope ? ` ${config.scope}` : ''}`;
-        anchor.title = description; anchor.setAttribute('aria-label', description); link(anchor, service.incident?.url || config.url);
-        anchor.append(name, state); row.append(anchor); statuses.append(row);
-      }
-      get('tech-status-list').replaceChildren(statuses); statusSignature = key;
+    const slides = [], used = new Set();
+    function card(key, signature, create) {
+      used.add(key); let entry = cards.get(key);
+      if (!entry || entry.signature !== signature) { entry = { signature, node: create() }; entry.node.dataset.slideId = key; cards.set(key, entry); }
+      slides.push(entry.node);
     }
-    const articleKey = JSON.stringify({ articles, loading: inFlight && !articles.length });
-    if (articleKey !== articleSignature) {
-      const headlines = doc.createDocumentFragment();
-      for (const article of articles) {
-        const row = doc.createElement('li'), anchor = doc.createElement('a'), detail = doc.createElement('span');
-        row.className = 'tech-news-item'; anchor.className = 'tech-news-link'; anchor.textContent = article.title; anchor.title = article.title;
-        link(anchor, article.url); detail.className = 'tech-news-detail'; detail.textContent = `${article.source} · ${techDate(article.publishedAt)}`;
-        row.append(anchor, detail); headlines.append(row);
-      }
-      if (!articles.length) { const item = doc.createElement('li'); item.className = 'tech-news-empty'; item.textContent = inFlight ? 'Chargement des nouvelles…' : 'Aucune actualité récente disponible.'; headlines.append(item); }
-      get('tech-news-list').replaceChildren(headlines); articleSignature = articleKey;
+    for (const service of services) {
+      const config = SERVICES.find(item => item.id === service.id);
+      const stale = service.checkFailed || !service.checkedAt || at - Date.parse(service.checkedAt) > (service.id === 'microsoft' ? 90 : 20) * 60_000;
+      card(`service-${service.id}`, JSON.stringify({ service, stale }), () => {
+        const row = doc.createElement('div'), name = doc.createElement('span'), anchor = doc.createElement('a'), detail = doc.createElement('p'), date = doc.createElement('time');
+        row.className = 'tech-slide tech-service-slide'; row.dataset.state = service.status; row.dataset.stale = String(stale);
+        name.className = 'tech-slide-kicker'; name.textContent = service.name;
+        anchor.className = 'tech-slide-title'; anchor.textContent = serviceLabel(service); link(anchor, service.incident?.url || config.url);
+        detail.className = 'tech-slide-detail'; detail.textContent = service.incident?.title || config.scope || (service.checkedAt ? 'État annoncé par la page officielle.' : 'En attente d’une lecture de la source officielle.');
+        const description = `${service.name} : ${serviceLabel(service)}. ${stale && service.checkedAt ? 'Dernier statut connu. ' : ''}Relevé : ${techDate(service.checkedAt)}. ${detail.textContent}`;
+        anchor.title = description; anchor.setAttribute('aria-label', description);
+        date.className = 'tech-slide-date'; date.textContent = service.checkedAt ? `${stale ? 'Dernier relevé' : 'Vérifié'} : ${techDate(service.checkedAt)}` : 'Non vérifié';
+        if (service.checkedAt) date.dateTime = service.checkedAt;
+        row.append(name, anchor, detail, date); return row;
+      });
     }
+    for (const article of articles) card(`article-${article.id}`, JSON.stringify(article), () => {
+      const row = doc.createElement('div'), source = doc.createElement('span'), anchor = doc.createElement('a'), date = doc.createElement('time');
+      row.className = 'tech-slide tech-article-slide'; source.className = 'tech-slide-kicker'; source.textContent = `Actualité · ${article.source}`;
+      anchor.className = 'tech-slide-title'; anchor.textContent = article.title; anchor.title = article.title; link(anchor, article.url);
+      date.className = 'tech-slide-date'; date.textContent = techDate(article.publishedAt); date.dateTime = article.publishedAt;
+      row.append(source, anchor, date); return row;
+    });
+    if (!articles.length) card('news-empty', String(inFlight), () => {
+      const row = doc.createElement('div'), title = doc.createElement('p'); row.className = 'tech-slide tech-article-slide'; title.className = 'tech-slide-detail';
+      title.textContent = inFlight ? 'Chargement des nouvelles…' : 'Aucune actualité récente disponible.'; row.append(title); return row;
+    });
+    for (const key of cards.keys()) if (!used.has(key)) cards.delete(key);
+    carousel?.setSlides(slides);
     const newsStale = requestFailed || snapshot?.newsCheckFailed || !snapshot?.newsCheckedAt || at - Date.parse(snapshot.newsCheckedAt) > 90 * 60_000;
     const statusStale = services.some(service => service.checkedAt && (service.checkFailed || at - Date.parse(service.checkedAt) > (service.id === 'microsoft' ? 90 : 20) * 60_000));
     const hasObservation = snapshot?.newsCheckedAt || services.some(service => service.checkedAt);
     const warning = get('tech-news-warning'); warning.hidden = !newsStale && !statusStale;
     warning.textContent = newsStale || statusStale ? hasObservation ? 'Certaines sources ne sont pas à jour · dernières données conservées.' : inFlight ? '' : 'Sources indisponibles · nouvelle tentative automatique.' : '';
     warning.hidden = !warning.textContent;
-    get('tech-news-meta').textContent = snapshot?.newsCheckedAt ? `Titres relevés le ${techDate(snapshot.newsCheckedAt)}` : 'Sources publiques · sans connexion';
-    get('tech-news-list').setAttribute('aria-busy', String(inFlight)); get('tech-news-refresh').disabled = inFlight;
+    get('tech-news-meta').textContent = 'Actualisation automatique';
+    get('tech-news-meta').title = snapshot?.newsCheckedAt ? `Titres relevés le ${techDate(snapshot.newsCheckedAt)} · sources publiques` : 'Sources publiques · sans connexion';
+    get('tech-carousel-slides')?.setAttribute('aria-busy', String(inFlight)); get('tech-news-refresh').disabled = inFlight;
     panel.dataset.state = hasObservation ? newsStale || statusStale ? 'stale' : 'ready' : inFlight ? 'loading' : 'unavailable';
   }
   async function json(url, signal) {
@@ -88,7 +98,7 @@ export function initializeTechNews(options = {}) {
   const onClick = () => void refresh();
   function dispose(event) {
     if (event?.persisted) return;
-    disposed = true; controller?.abort(); clearInterval(timer); auto.dispose();
+    disposed = true; controller?.abort(); clearInterval(timer); auto.dispose(); carousel?.dispose();
     get('tech-news-refresh').removeEventListener?.('click', onClick); win.removeEventListener?.('pagehide', dispose);
   }
   get('tech-news-refresh').addEventListener('click', onClick); win.addEventListener?.('pagehide', dispose);

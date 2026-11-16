@@ -12,7 +12,7 @@ Sur ordinateur, le résumé et les accès rapides précèdent une grille unique 
 
 ## Actualités tech et incidents publics
 
-Un panneau compact réunit les statuts publics Microsoft, OpenAI et Anthropic, puis jusqu’à cinq titres récents concernant Microsoft, l’IA, Nvidia, le cloud et la cybersécurité. Chaque titre conserve sa source, sa date en heure suisse et son lien vers l’article. Aucun texte intégral d’article n’est recopié. Le panneau fonctionne sans connexion Microsoft et ne consulte aucune donnée privée.
+Un carrousel compact « Infos et statuts », en haut à droite près de GitHub, réunit d’abord la pastille de l’intranet, les statuts publics Microsoft, OpenAI et Anthropic, puis jusqu’à cinq titres récents concernant Microsoft, l’IA, Nvidia, le cloud et la cybersécurité. Les flèches permettent de passer manuellement d’un élément à l’autre ; les touches gauche et droite fonctionnent aussi lorsque la zone de contenu a le focus. Il n’y a aucun défilement automatique et l’élément choisi est conservé lors d’une actualisation. Chaque titre conserve sa source, sa date en heure suisse et son lien vers l’article. Aucun texte intégral d’article n’est recopié. Le bloc fonctionne sans connexion Microsoft et ne consulte aucune donnée privée.
 
 Le navigateur interroge les API officielles OpenAI et Claude toutes les cinq minutes, avec lecture conjointe du résumé et des incidents. Un incident résolu reste distinct d’un incident en cours ; un état inconnu n’est jamais assimilé à un service opérationnel. Le signal public Microsoft ne couvre pas tous les incidents du locataire Microsoft 365 : l’état vert signifie uniquement « Aucun avis public », et cette limite figure dans le texte accessible du statut.
 

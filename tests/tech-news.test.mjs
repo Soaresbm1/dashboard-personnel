@@ -59,11 +59,13 @@ function harness(options = {}) {
     constructor() { this.children = []; this.textContent = ''; this.dataset = {}; this.hidden = false; this.attributes = {}; this.events = new Map(); }
     append(...items) { this.children.push(...items); }
     replaceChildren(...items) { this.children = items.flatMap(item => item.fragment ? item.children : [item]); }
+    insertBefore(item, before) { this.children = this.children.filter(child => child !== item); const at = before ? this.children.indexOf(before) : this.children.length; this.children.splice(at, 0, item); }
+    removeChild(item) { this.children = this.children.filter(child => child !== item); }
     setAttribute(key, value) { this.attributes[key] = value; }
     addEventListener(name, callback) { this.events.set(name, callback); }
     removeEventListener(name) { this.events.delete(name); }
   }
-  for (const id of ['tech-news-panel', 'tech-status-list', 'tech-news-list', 'tech-news-meta', 'tech-news-warning', 'tech-news-refresh']) nodes.set(id, new Element());
+  for (const id of ['tech-news-panel', 'tech-carousel', 'tech-intranet-slide', 'tech-carousel-slides', 'tech-prev', 'tech-next', 'tech-slide-position', 'tech-news-meta', 'tech-news-warning', 'tech-news-refresh']) nodes.set(id, new Element());
   const doc = { hidden: options.hidden || false, getElementById: id => nodes.get(id), createElement: () => new Element(), createDocumentFragment: () => Object.assign(new Element(), { fragment: true }) };
   const win = { navigator: { onLine: !options.offline }, addEventListener: (name, callback) => listeners.set(name, callback), removeEventListener: name => listeners.delete(name) };
   const instance = initializeTechNews({ document: doc, window: win, now: () => clock,
@@ -79,24 +81,25 @@ test('Initial rendering loads public sources without credentials and refreshes e
   try {
     assert.equal(h.requests.length, 5); assert.equal(h.settings.intervalMs, 300_000); assert.equal(TECH_NEWS_INTERVAL_MS, 300_000);
     for (const request of h.requests) { assert.equal(request.request.credentials, 'omit'); assert.equal(request.request.method, 'GET'); assert.equal(request.request.headers, undefined); }
-    assert.match(text(h.nodes.get('tech-news-list')), /Nouvelle technologie/);
+    assert.match(text(h.nodes.get('tech-carousel-slides')), /Nouvelle technologie/);
     assert.equal(h.nodes.get('tech-news-warning').hidden, true); assert.equal(h.nodes.get('tech-news-panel').dataset.state, 'ready');
     const cache = JSON.parse(h.cache.get(TECH_NEWS_CACHE_KEY)); assert.equal(cache.newsCheckedAt, iso(NOW));
-    assert.equal(h.nodes.get('tech-status-list').children.length, 3);
+    assert.equal(h.nodes.get('tech-carousel-slides').children.filter(row => row.dataset.slideId.startsWith('service-')).length, 3);
+    assert.equal(h.nodes.get('tech-slide-position').textContent, '1 / 5');
   } finally { h.instance.dispose(); }
 });
 test('Network failure retains visible headlines and service colors with their original observation timestamps', async () => {
   let failed = false;
   const h = harness({ fetch: url => { if (failed) throw Error('offline'); return new Response(JSON.stringify(url === TECH_NEWS_URL ? feed() : url.endsWith('summary.json') ? summary : incidents)); } }); await settle();
   try {
-    const priorRow = h.nodes.get('tech-news-list').children[0];
+    const priorRow = h.nodes.get('tech-carousel-slides').children.find(row => row.dataset.slideId.startsWith('article-'));
     failed = true; h.advance(TECH_NEWS_INTERVAL_MS); await h.instance.refresh();
-    assert.match(text(h.nodes.get('tech-news-list')), /Nouvelle technologie/);
+    assert.match(text(h.nodes.get('tech-carousel-slides')), /Nouvelle technologie/);
     assert.equal(h.nodes.get('tech-news-warning').hidden, false);
     const cache = JSON.parse(h.cache.get(TECH_NEWS_CACHE_KEY)); assert.equal(cache.newsCheckedAt, iso(NOW));
     const openai = cache.services.find(service => service.id === 'openai'); assert.equal(openai.status, 'operational'); assert.equal(openai.checkedAt, iso(NOW)); assert.equal(openai.checkFailed, true);
     assert.equal(h.nodes.get('tech-news-panel').dataset.state, 'stale');
-    assert.equal(h.nodes.get('tech-news-list').children[0], priorRow);
+    assert.equal(h.nodes.get('tech-carousel-slides').children.find(row => row.dataset.slideId.startsWith('article-')), priorRow);
   } finally { h.instance.dispose(); }
 });
 test('Hidden/offline pages do not fetch, an unavailable source is never shown green and disposal ignores late results', async () => {
@@ -106,10 +109,10 @@ test('Hidden/offline pages do not fetch, an unavailable source is never shown gr
   const h = harness({ fetch: () => { throw Error('unavailable'); } }); await settle();
   try {
     const cache = JSON.parse(h.cache.get(TECH_NEWS_CACHE_KEY)); assert.ok(cache.services.every(service => service.status === 'unknown'));
-    assert.ok(h.nodes.get('tech-status-list').children.every(row => row.children[0].dataset.state === 'unknown'));
+    assert.ok(h.nodes.get('tech-carousel-slides').children.filter(row => row.dataset.slideId.startsWith('service-')).every(row => row.dataset.state === 'unknown'));
     assert.equal(h.nodes.get('tech-news-panel').dataset.state, 'unavailable');
     assert.match(h.nodes.get('tech-news-warning').textContent, /Sources indisponibles/);
-    assert.doesNotMatch(h.nodes.get('tech-news-list').children[0].textContent, /Chargement/);
+    assert.doesNotMatch(text(h.nodes.get('tech-carousel-slides').children.at(-1)), /Chargement/);
   } finally { h.instance.dispose(); }
   const releases = [];
   const late = harness({ fetch: url => new Promise(resolve => { releases.push(() => resolve(new Response(JSON.stringify(url === TECH_NEWS_URL ? feed() : url.endsWith('summary.json') ? summary : incidents)))); }) });
