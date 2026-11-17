@@ -58,6 +58,7 @@ export function initializeTechNews(options = {}) {
     const hasObservation = snapshot?.newsCheckedAt || services.some(service => service.checkedAt);
     const warning = get('tech-news-warning'); warning.hidden = !newsStale && !statusStale;
     warning.textContent = newsStale || statusStale ? hasObservation ? 'Certaines sources ne sont pas à jour · dernières données conservées.' : inFlight ? '' : 'Sources indisponibles · nouvelle tentative automatique.' : '';
+    warning.title = warning.textContent;
     warning.hidden = !warning.textContent;
     get('tech-news-meta').textContent = 'Actualisation automatique';
     get('tech-news-meta').title = snapshot?.newsCheckedAt ? `Titres relevés le ${techDate(snapshot.newsCheckedAt)} · sources publiques` : 'Sources publiques · sans connexion';
