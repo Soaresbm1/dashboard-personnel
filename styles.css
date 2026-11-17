@@ -143,7 +143,7 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .news-item-content.is-rich > :last-child { margin-bottom: 0; }
 .mail-item.is-important .mail-item-subject { font-weight: 600; }
 .panel-header h2 .item-count { margin-left: 6px; vertical-align: middle; }
-.summary-grid { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.6fr) minmax(0, .85fr) minmax(0, 2.7fr) minmax(0, 1.35fr) clamp(220px, 17vw, 280px); flex-shrink: 0; margin: 0; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.summary-grid { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.6fr) minmax(0, .85fr) minmax(0, 2.7fr) minmax(0, 1.35fr) clamp(180px, 13vw, 220px); flex-shrink: 0; margin: 0; padding: 11px 0; border-bottom: 1px solid var(--line); }
 .summary-item { min-width: 0; padding: 0 20px; }
 .summary-item:first-child { padding-left: 0; }
 .summary-item + .summary-item { border-left: 1px solid var(--line); }
@@ -241,17 +241,17 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .summary-item.tech-summary { text-align: left; }
 .tech-summary-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .tech-summary-heading > span { color: var(--ink); font-weight: 600; }
-.tech-summary-heading .icon-button { width: 23px; height: 23px; border: 0; }
+.tech-summary-heading .icon-button { width: 20px; height: 20px; border: 0; }
 .tech-summary-heading .icon-button .icon { width: 13px; height: 13px; }
-.tech-carousel { min-width: 0; height: 110px; margin-top: 3px; }
+.tech-carousel { min-width: 0; height: 88px; margin-top: 3px; }
 .tech-carousel-slides { min-width: 0; }
-.tech-slide { display: flex; flex-direction: column; min-width: 0; height: 110px; gap: 3px; }
+.tech-slide { display: flex; flex-direction: column; min-width: 0; height: 88px; gap: 3px; }
 .tech-slide-kicker { overflow: hidden; color: var(--muted); font-size: 9px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
-.tech-slide-title { display: -webkit-box; overflow: hidden; color: var(--ink); font-size: 12px; font-weight: 550; line-height: 1.5; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.tech-slide-title { display: -webkit-box; overflow: hidden; color: var(--ink); font-size: 12px; font-weight: 550; line-height: 1.5; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .tech-slide-title:focus-visible { outline-offset: 2px; }
 .tech-slide-detail { display: -webkit-box; overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.4; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .tech-slide-date { display: block; margin-top: auto; color: var(--muted); font-size: 9px; line-height: 1.4; font-variant-numeric: tabular-nums; }
-.tech-service-slide .tech-slide-title { font-size: 18px; font-weight: 600; line-height: 1.35; -webkit-line-clamp: 1; }
+.tech-service-slide .tech-slide-title { font-size: 16px; font-weight: 600; line-height: 1.35; -webkit-line-clamp: 1; }
 .tech-service-slide .tech-slide-title::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: #8b96a7; vertical-align: 2px; }
 .tech-service-slide[data-state="operational"] .tech-slide-title::before { background: #23856b; }
 .tech-service-slide[data-state="degraded"] .tech-slide-title::before, .tech-service-slide[data-state="maintenance"] .tech-slide-title::before { background: #aa741c; }
@@ -259,9 +259,10 @@ main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .tech-service-slide[data-stale="true"] .tech-slide-date { font-style: italic; }
 .tech-intranet-slide { gap: 0; text-align: center; }
 .tech-intranet-status { min-width: 0; }
-.tech-intranet-status .intranet-health { margin-top: 2px; }
+.tech-intranet-status .intranet-health { width: 56px; height: 56px; margin-top: 2px; padding: 4px; font-size: 10px; }
+.tech-intranet-status .health-symbol .icon { width: 20px; height: 20px; }
 .tech-intranet-status .health-checked { margin-top: 2px; font-size: 9px; line-height: 1.3; }
-.tech-carousel-controls { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 5px; }
+.tech-carousel-controls { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 3px; }
 .tech-carousel-button { display: inline-flex; align-items: center; justify-content: center; width: 25px; height: 25px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); }
 .tech-carousel-button:hover:enabled { color: var(--blue); border-color: #bcc8e3; background: var(--subtle); }
 .tech-carousel-button .icon { width: 14px; height: 14px; }
