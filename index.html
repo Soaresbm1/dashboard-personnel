@@ -7,7 +7,7 @@
   <meta name="description" content="Votre agenda, vos mails, vos tâches, l’intranet et les actualités tech, réunis dans une vue compacte.">
   <title>Dashboard — Vue d’ensemble</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=20261117-short-header">
+  <link rel="stylesheet" href="styles.css?v=20261118-top-links">
   <script src="app.js" type="module"></script>
   <script src="microsoft-connection.mjs" type="module"></script>
   <script src="outlook.js" type="module"></script>
@@ -37,6 +37,16 @@
   <div class="dashboard-shell">
     <header class="topbar">
       <a class="brand" href="#overview" aria-label="Dashboard, vue d’ensemble"><svg class="icon" aria-hidden="true"><use href="#i-grid"/></svg><span>dashboard</span></a>
+      <nav class="topbar-links" aria-label="Raccourcis web">
+        <a href="https://outlook.office.com/mail/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Outlook <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
+        <a href="https://outlook.office.com/calendar/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Calendrier <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
+        <a href="https://teams.microsoft.com/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Teams <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
+        <a href="https://intranet.isp-spi.ch/intranet" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Intranet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
+        <a href="https://abaprod.isp-spi.ch/portal/myabacus/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">MyAbacus <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
+        <a href="https://github.com/Soaresbm1?tab=repositories" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">GitHub <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
+        <a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">ChatGPT <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
+        <a href="https://www.sbb.ch/fr" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">CFF <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
+      </nav>
       <div class="topbar-right">
         <time id="top-date" class="date-label"></time>
         <button id="notifications-open" class="icon-button notification-trigger" type="button" aria-haspopup="dialog" aria-controls="notifications-dialog" aria-label="Notifications, 0 non vues" title="Notifications regroupées"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg><span id="notifications-count" class="notification-count" aria-hidden="true" hidden>0</span></button>
@@ -133,17 +143,10 @@
           </dd>
         </div>
       </dl>
-      <nav class="quick-access" aria-label="Accès rapides">
-        <span class="quick-access-label">Accès rapides</span>
-        <a href="https://outlook.office.com/mail/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Courrier Outlook <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
-        <a href="https://outlook.office.com/calendar/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Calendrier <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
-        <a href="https://teams.microsoft.com/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Teams <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
-        <a href="https://intranet.isp-spi.ch/intranet" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Intranet <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg></a>
-        <span id="workplace-tools" class="workplace-tools">
-          <button id="directory-open" type="button" aria-haspopup="dialog" aria-controls="directory-setup">Annuaire</button>
-          <button id="rooms-open" type="button" aria-haspopup="dialog" aria-controls="rooms-setup">Salles <span id="rooms-summary" class="tool-summary">—</span></button>
-        </span>
-      </nav>
+      <div id="workplace-tools" class="workplace-tools" role="group" aria-label="Outils internes">
+        <button id="directory-open" type="button" aria-haspopup="dialog" aria-controls="directory-setup">Annuaire</button>
+        <button id="rooms-open" type="button" aria-haspopup="dialog" aria-controls="rooms-setup">Salles <span id="rooms-summary" class="tool-summary">—</span></button>
+      </div>
       <div class="overview-grid">
         <section id="outlook-agenda" class="panel agenda-panel" aria-labelledby="outlook-title">
           <header class="panel-header">
